@@ -46,3 +46,9 @@ credentials*
 # --- Noise --------------------------------------------------------------------
 Thumbs.db
 desktop.ini
+
+# Unrelated assets that landed in the repo directory - not part of this project.
+.sounds/
+*.mp3
+*.wav
+*.m4a
