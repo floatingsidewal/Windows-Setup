@@ -84,9 +84,32 @@ if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
 if (-not $SkipProvision) {
     if (-not (Test-Path $configFile)) { throw "Config not found: $configFile" }
 
+    # `winget configure --enable` first pulls any pending App Installer update
+    # from the Microsoft Store and does not complete until that lands - which
+    # looks exactly like a silent hang. Get the update out of the way first.
+    # A non-zero exit here just means "already current", so it is not checked.
+    Write-Step 'Ensuring App Installer is current'
+    if ($PSCmdlet.ShouldProcess('Microsoft.AppInstaller', 'upgrade')) {
+        winget upgrade --id Microsoft.AppInstaller `
+            --accept-package-agreements --accept-source-agreements --disable-interactivity
+    }
+
     Write-Step 'Enabling winget configuration support'
     if ($PSCmdlet.ShouldProcess('winget', 'configure --enable')) {
         winget configure --enable
+        if ($LASTEXITCODE -ne 0) {
+            throw @"
+'winget configure --enable' failed (exit $LASTEXITCODE).
+
+This is an administrator setting and needs an elevated shell. If it was elevated,
+App Installer likely has a pending Store update - it must finish before
+configuration can be enabled. Try:
+
+  winget upgrade --id Microsoft.AppInstaller
+  (open a NEW elevated terminal so the update takes effect)
+  winget configure --enable
+"@
+        }
     }
 
     Write-Step 'Validating configuration'
