@@ -36,7 +36,9 @@
 param(
     [string]$Branch    = 'main',
     [string]$Workspace = (Join-Path $env:USERPROFILE 'git'),
-    [switch]$NoProvision
+    [switch]$NoProvision,
+    # Bindable as -m365; PowerShell parameter matching is case-insensitive.
+    [switch]$M365
 )
 
 $ErrorActionPreference = 'Stop'
@@ -144,9 +146,12 @@ else { $shell = 'powershell' }
 # runs the script with $PSScriptRoot empty even though -File resolved fine, so
 # bootstrap.ps1 cannot infer its own location reliably.
 
+if ($M365) { Write-Host '    M365 requested - OneDrive + Microsoft 365 Apps will be installed' -ForegroundColor DarkGray }
+
 if ($isAdmin) {
     Write-Step 'Already elevated - running bootstrap.ps1 here'
-    & $bootstrap -RepoRoot $Target
+    if ($M365) { & $bootstrap -RepoRoot $Target -M365 }
+    else       { & $bootstrap -RepoRoot $Target }
     return
 }
 
@@ -157,17 +162,20 @@ $sudo = Get-Command sudo.exe -ErrorAction SilentlyContinue
 
 if ($sudo) {
     Write-Step 'Elevating via sudo (a UAC prompt is expected)'
-    & $sudo.Source $shell -ExecutionPolicy Bypass -File $bootstrap -RepoRoot $Target
+    if ($M365) { & $sudo.Source $shell -ExecutionPolicy Bypass -File $bootstrap -RepoRoot $Target -M365 }
+    else       { & $sudo.Source $shell -ExecutionPolicy Bypass -File $bootstrap -RepoRoot $Target }
     if ($LASTEXITCODE -eq 0) { return }
     Write-Warning "sudo returned $LASTEXITCODE - falling back to a separate elevated window."
 }
 
 Write-Step 'Launching bootstrap.ps1 in an elevated window'
 Write-Host '    (a UAC prompt is expected)' -ForegroundColor DarkGray
-Start-Process -FilePath $shell -Verb RunAs -ArgumentList @(
+$bootstrapArgs = @(
     '-NoExit'
     '-ExecutionPolicy', 'Bypass'
     '-File', "`"$bootstrap`""
     '-RepoRoot', "`"$Target`""
 )
+if ($M365) { $bootstrapArgs += '-M365' }
+Start-Process -FilePath $shell -Verb RunAs -ArgumentList $bootstrapArgs
 Write-Ok 'elevated window launched - watch it for progress'

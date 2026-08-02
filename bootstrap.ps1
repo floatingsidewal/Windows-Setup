@@ -26,7 +26,9 @@ param(
     [string]$RepoRoot,
     [string]$FancyZonesSource,
     [switch]$SkipProvision,
-    [switch]$SkipFancyZones
+    [switch]$SkipFancyZones,
+    # Bindable as -m365; PowerShell parameter matching is case-insensitive.
+    [switch]$M365
 )
 
 $ErrorActionPreference = 'Stop'
@@ -61,6 +63,7 @@ if (-not $FancyZonesSource) {
 }
 
 $configFile = Join-Path $RepoRoot 'config\dev-config.winget'
+$m365File   = Join-Path $RepoRoot 'config\m365.winget'
 $importer   = Join-Path $RepoRoot 'powertoys\Import-FancyZones.ps1'
 
 function Write-Step { param([string]$Text) Write-Host "`n==> $Text" -ForegroundColor Cyan }
@@ -103,6 +106,29 @@ if (-not $SkipProvision) {
     Write-Step 'Skipping provision (-SkipProvision)'
 }
 
+# --- M365 (opt-in) ------------------------------------------------------------
+# Kept in a separate config so the base provision stays lean. Microsoft 365 Apps
+# is a large Click-to-Run download and will dominate this step's runtime.
+if ($M365) {
+    if (-not (Test-Path $m365File)) { throw "M365 config not found: $m365File" }
+
+    Write-Step 'Validating M365 configuration'
+    if ($PSCmdlet.ShouldProcess($m365File, 'validate')) {
+        winget configure validate -f $m365File
+        if ($LASTEXITCODE -ne 0) { throw "M365 validation failed (exit $LASTEXITCODE)." }
+    }
+
+    Write-Step 'Installing OneDrive and Microsoft 365 Apps (large download)'
+    if ($PSCmdlet.ShouldProcess($m365File, 'apply')) {
+        winget configure -f $m365File --accept-configuration-agreements --disable-interactivity
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "M365 configure exited $LASTEXITCODE - review the output above."
+        }
+    }
+} else {
+    Write-Step 'Skipping M365 (pass -m365 to install OneDrive + Microsoft 365 Apps)'
+}
+
 # --- FancyZones ---------------------------------------------------------------
 if ($SkipFancyZones) {
     Write-Step 'Skipping FancyZones (-SkipFancyZones)'
@@ -110,15 +136,6 @@ if ($SkipFancyZones) {
 }
 
 Write-Step 'Configuring FancyZones'
-
-$ptRoot = Join-Path $env:LOCALAPPDATA 'Microsoft\PowerToys'
-if (-not (Test-Path $ptRoot)) {
-    Write-Warning @"
-PowerToys has not written its settings yet. Launch PowerToys once from the
-Start menu, then re-run:  .\bootstrap.ps1 -SkipProvision
-"@
-    return
-}
 
 $layouts = Join-Path $FancyZonesSource 'custom-layouts.json'
 if (-not (Test-Path $layouts)) {

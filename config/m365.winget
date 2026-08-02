@@ -1,0 +1,35 @@
+# M365 — OPTIONAL. Not part of the base provision.
+# Applied only when bootstrap.ps1 is run with -m365.
+#
+# Standalone use:
+#   winget configure -f m365.winget --accept-configuration-agreements --disable-interactivity
+
+$schema: https://raw.githubusercontent.com/PowerShell/DSC/main/schemas/2023/08/config/document.json
+metadata:
+  winget:
+    processor:
+      identifier: dscv3
+resources:
+
+- type: Microsoft.WinGet/Package
+  name: OneDrive
+  properties:
+    id: Microsoft.OneDrive
+    source: winget
+    useLatest: true
+    installMode: silent
+  metadata:
+    description: Install Microsoft OneDrive
+
+# Microsoft 365 Apps for enterprise. This is a large download and pulls the full
+# Click-to-Run installer - expect it to dominate the runtime of a -m365 pass.
+- type: Microsoft.WinGet/Package
+  name: Microsoft365Apps
+  properties:
+    id: Microsoft.Office
+    source: winget
+    useLatest: true
+    installMode: silent
+  metadata:
+    description: Install Microsoft 365 Apps for enterprise
+    securityContext: elevated

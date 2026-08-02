@@ -31,8 +31,30 @@ $fzDir    = Join-Path $ptRoot 'FancyZones'
 $rootJson = Join-Path $ptRoot 'settings.json'
 $fzJson   = Join-Path $fzDir  'settings.json'
 
-if (-not (Test-Path $ptRoot))     { throw "PowerToys not found at $ptRoot. Install it and launch it once first." }
 if (-not (Test-Path $SourcePath)) { throw "SourcePath not found: $SourcePath" }
+
+# Locate the installed binary. This - not the settings directory - is what tells
+# us PowerToys is actually present.
+$exe = @(
+    (Join-Path $env:LOCALAPPDATA 'PowerToys\PowerToys.exe')
+    (Join-Path $env:ProgramFiles 'PowerToys\PowerToys.exe')
+    (Join-Path ${env:ProgramFiles(x86)} 'PowerToys\PowerToys.exe')
+) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+
+if (-not $exe) {
+    throw 'PowerToys is not installed. Run bootstrap.ps1 (or: winget install --id Microsoft.PowerToys) first.'
+}
+
+# PowerToys only creates %LOCALAPPDATA%\Microsoft\PowerToys on its FIRST RUN.
+# Rather than making the user launch it manually, seed the directory - PowerToys
+# reads existing settings on startup and fills in defaults for anything absent,
+# so a partial tree is fine.
+if (-not (Test-Path $ptRoot)) {
+    if ($PSCmdlet.ShouldProcess($ptRoot, 'Create PowerToys settings directory (first run not yet performed)')) {
+        New-Item -ItemType Directory -Path $ptRoot -Force | Out-Null
+        Write-Host 'PowerToys has not run yet - seeding its settings directory.' -ForegroundColor DarkGray
+    }
+}
 
 # Layout data that is portable between machines.
 $portable = @(
@@ -101,17 +123,23 @@ function Set-JsonProp {
 }
 
 # --- enable the FancyZones module --------------------------------------------
+# Absent settings.json means PowerToys has never run. Write a minimal one rather
+# than bailing; PowerToys merges in defaults for every key we omit.
 if (Test-Path $rootJson) {
     $root = Get-Content $rootJson -Raw | ConvertFrom-Json
-    if (-not $root.enabled) { Set-JsonProp $root 'enabled' ([pscustomobject]@{}) }
-    Set-JsonProp $root.enabled 'FancyZones' $true
-    if ($PSCmdlet.ShouldProcess($rootJson, 'Enable FancyZones module')) {
-        Copy-Item $rootJson "$rootJson.bak" -Force
-        $root | ConvertTo-Json -Depth 32 | Set-Content $rootJson -Encoding UTF8
-        Write-Host 'Enabled FancyZones module.' -ForegroundColor Green
-    }
+    $backup = $true
 } else {
-    Write-Warning "$rootJson not found - launch PowerToys once, then re-run."
+    $root = [pscustomobject]@{}
+    $backup = $false
+}
+
+if (-not $root.enabled) { Set-JsonProp $root 'enabled' ([pscustomobject]@{}) }
+Set-JsonProp $root.enabled 'FancyZones' $true
+
+if ($PSCmdlet.ShouldProcess($rootJson, 'Enable FancyZones module')) {
+    if ($backup) { Copy-Item $rootJson "$rootJson.bak" -Force }
+    $root | ConvertTo-Json -Depth 32 | Set-Content $rootJson -Encoding UTF8
+    Write-Host 'Enabled FancyZones module.' -ForegroundColor Green
 }
 
 # --- override Windows Snap ----------------------------------------------------
@@ -152,17 +180,14 @@ if ($PSCmdlet.ShouldProcess($fzJson, 'Write FancyZones snap-override settings'))
     Write-Host 'Set: override Windows Snap = on, move windows based on = relative position.' -ForegroundColor Green
 }
 
-# --- restart PowerToys --------------------------------------------------------
-$exe = Join-Path $env:LOCALAPPDATA 'PowerToys\PowerToys.exe'
-if (-not (Test-Path $exe)) { $exe = 'C:\Program Files\PowerToys\PowerToys.exe' }
-
-if (Test-Path $exe) {
-    if ($PSCmdlet.ShouldProcess($exe, 'Start PowerToys')) {
-        Start-Process $exe
-        Write-Host 'Restarted PowerToys.' -ForegroundColor Green
-    }
-} else {
-    Write-Warning "PowerToys.exe not found - start it from the Start menu."
+# --- start PowerToys ----------------------------------------------------------
+# $exe was resolved during preflight. Starting it here is also what performs
+# PowerToys' first run when it had never been launched - it picks up the
+# settings we just seeded.
+if ($PSCmdlet.ShouldProcess($exe, 'Start PowerToys')) {
+    Start-Process $exe
+    if ($wasRunning) { Write-Host 'Restarted PowerToys.' -ForegroundColor Green }
+    else             { Write-Host 'Started PowerToys.'   -ForegroundColor Green }
 }
 
 Write-Host ''

@@ -55,26 +55,44 @@ unavailable.
    irm https://raw.githubusercontent.com/floatingsidewal/Windows-Setup/main/install.ps1 | iex
    ```
 
-   Installs git, creates `~/git`, clones, then elevates into `bootstrap.ps1`,
-   which applies the winget config. This is the long step.
+   Installs git, creates `~/git`, clones, elevates into `bootstrap.ps1`, applies
+   the winget config, then imports FancyZones and starts PowerToys. Single pass.
+   This is the long step.
 
-3. **Launch PowerToys once** from the Start menu. The config installs it, but
-   PowerToys doesn't create `%LOCALAPPDATA%\Microsoft\PowerToys` until its first
-   run — so pass one skips the FancyZones step by design and tells you so.
-
-4. **Second pass** for FancyZones:
-
-   ```powershell
-   cd ~/git/Windows-Setup
-   .\bootstrap.ps1 -SkipProvision
-   ```
-
-5. **Assign a layout** — <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>`</kbd> opens the
+3. **Assign a layout** — <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>`</kbd> opens the
    editor. Pick an imported layout for the display, then verify:
 
    - Win+Left / Right / Up / Down move between zones
    - Win+Ctrl+Alt+0 / 1 / 4 apply the three layouts
    - Win+Ctrl+Alt+Arrow spans a window across zones
+
+   Layout-to-monitor assignment is the one genuinely manual step: it's keyed to
+   monitor hardware IDs, so it can't be imported.
+
+### Optional: Microsoft 365
+
+OneDrive and Microsoft 365 Apps are **not** installed by default. Opt in with
+`-m365`:
+
+```powershell
+cd ~/git/Windows-Setup
+.\bootstrap.ps1 -m365
+```
+
+`irm | iex` can't take arguments, so from the one-liner build a scriptblock:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/floatingsidewal/Windows-Setup/main/install.ps1))) -m365
+```
+
+They live in `config/m365.winget` and can also be applied standalone:
+
+```powershell
+winget configure -f config\m365.winget --accept-configuration-agreements --disable-interactivity
+```
+
+Microsoft 365 Apps is a large Click-to-Run download and will dominate the
+runtime of a `-m365` pass.
 
 ### Already cloned
 
@@ -96,6 +114,7 @@ Test-Clean.ps1                 # PII/secret scanner, exits 1 on findings
 config/
   dev-config.winget            # what actually runs - WSL removed
   dev-config.upstream.winget   # pristine upstream copy, for diffing on update
+  m365.winget                  # OPT-IN: OneDrive + Microsoft 365 Apps (-m365)
 powertoys/
   Import-FancyZones.ps1        # enables FancyZones, imports layouts, overrides snap
   fancyzones/                  # drop custom-layouts.json etc. here (see below)
