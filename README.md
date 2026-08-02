@@ -119,7 +119,7 @@ powertoys/
   Import-FancyZones.ps1        # enables FancyZones, imports layouts, overrides snap
   fancyzones/                  # drop custom-layouts.json etc. here (see below)
 dotfiles/
-  Install-Sounds.ps1           # deploys .sounds -> ~/.sounds, sets Terminal bell
+  Configure-Terminal.ps1       # bell sounds + paste warnings, one settings.json write
 .sounds/                       # bell sound pack (tracked on purpose)
 ```
 
@@ -191,7 +191,29 @@ After importing, assign a layout to the display once via **Win+Shift+`**.
 Setting a default per orientation makes it stick automatically when the
 Parallels display resolution changes.
 
-## Bell sounds
+## Windows Terminal
+
+`dotfiles\Configure-Terminal.ps1` owns every `settings.json` edit, applied as one
+read-modify-write with a single backup.
+
+### Paste warnings
+
+Both of Terminal's paste confirmation dialogs are turned off. They're root-level
+globals, not per-profile:
+
+| Setting | Default | Set to | Dialog |
+| --- | --- | --- | --- |
+| `largePasteWarning` | `true` | `false` | Pasting more than 5 KiB |
+| `multiLinePasteWarning` | `true` | `false` | Pasting anything containing a newline |
+
+`multiLinePasteWarning` guards against pasting multi-line text that the shell
+executes on arrival. Keep it with:
+
+```powershell
+.\dotfiles\Configure-Terminal.ps1 -SoundsSource .\.sounds -MultiLinePasteWarning $true
+```
+
+### Bell sounds
 
 `.sounds/` is deployed to `~/.sounds` and wired into Windows Terminal's
 **Defaults | Advanced | Bell sound**. Terminal's `bellSound` accepts an array and

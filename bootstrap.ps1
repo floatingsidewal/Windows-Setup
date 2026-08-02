@@ -195,20 +195,22 @@ if ($M365) {
     Write-Step 'Skipping M365 (pass -m365 to install OneDrive + Microsoft 365 Apps)'
 }
 
-# --- Bell sounds --------------------------------------------------------------
+# --- Windows Terminal -----------------------------------------------------------
 # Ahead of FancyZones, because -SkipFancyZones returns early.
-Write-Step 'Deploying bell sound pack'
-$soundsSource = Join-Path $RepoRoot '.sounds'
-$soundsScript = Join-Path $RepoRoot 'dotfiles\Install-Sounds.ps1'
+Write-Step 'Configuring Windows Terminal (bell sounds, paste warnings)'
+$soundsSource   = Join-Path $RepoRoot '.sounds'
+$terminalScript = Join-Path $RepoRoot 'dotfiles\Configure-Terminal.ps1'
 
-if (-not (Test-Path $soundsSource)) {
-    Write-Warning "No .sounds directory at $soundsSource - skipping."
-} elseif (-not (Test-Path $soundsScript)) {
-    Write-Warning "Install-Sounds.ps1 not found at $soundsScript - skipping."
+if (-not (Test-Path $terminalScript)) {
+    Write-Warning "Configure-Terminal.ps1 not found at $terminalScript - skipping."
 } else {
-    $soundArgs = @{ SourcePath = $soundsSource }
-    if ($PSBoundParameters.ContainsKey('WhatIf')) { $soundArgs['WhatIf'] = $true }
-    & $soundsScript @soundArgs
+    $termArgs = @{ SoundsSource = $soundsSource }
+    if (-not (Test-Path $soundsSource)) {
+        Write-Warning "No .sounds directory at $soundsSource - configuring Terminal without the bell pack."
+        $termArgs['SkipSounds'] = $true
+    }
+    if ($PSBoundParameters.ContainsKey('WhatIf')) { $termArgs['WhatIf'] = $true }
+    & $terminalScript @termArgs
 }
 
 # --- FancyZones ---------------------------------------------------------------
