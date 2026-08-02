@@ -228,8 +228,8 @@ name, preferring `.wav` (override with `-PreferFormat`). 31 files currently
 collapse to 16 unique sounds.
 
 ```powershell
-.\dotfiles\Install-Sounds.ps1 -SourcePath .\.sounds -WhatIf   # dry run
-.\dotfiles\Install-Sounds.ps1 -SourcePath .\.sounds
+.\dotfiles\Configure-Terminal.ps1 -SoundsSource .\.sounds -WhatIf   # dry run
+.\dotfiles\Configure-Terminal.ps1 -SoundsSource .\.sounds
 ```
 
 `bellStyle` is left alone — it defaults to `"audible"`, which plays the sound.

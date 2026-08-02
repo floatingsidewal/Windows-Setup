@@ -48,4 +48,4 @@ Thumbs.db
 desktop.ini
 
 # NOTE: .sounds/ is INTENTIONALLY tracked - it is the Windows Terminal bell
-# sound pack, deployed to ~/.sounds by dotfiles\Install-Sounds.ps1.
+# sound pack, deployed to ~/.sounds by dotfiles\Configure-Terminal.ps1.
