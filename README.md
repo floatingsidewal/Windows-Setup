@@ -37,6 +37,45 @@ what it writes, so the cloned scripts run without needing `Unblock-File`.
 in one window, and falls back to a separate elevated window if `sudo` is
 unavailable.
 
+### Full sequence on a fresh install
+
+1. **Prerequisites**, from a normal unelevated PowerShell:
+
+   ```powershell
+   sudo config --enable normal
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   ```
+
+   `-Scope CurrentUser` matters — with no scope, `Set-ExecutionPolicy` targets
+   `LocalMachine` and fails unelevated.
+
+2. **Run the installer**, still unelevated. Expect a UAC prompt when it elevates:
+
+   ```powershell
+   irm https://raw.githubusercontent.com/floatingsidewal/Windows-Setup/main/install.ps1 | iex
+   ```
+
+   Installs git, creates `~/git`, clones, then elevates into `bootstrap.ps1`,
+   which applies the winget config. This is the long step.
+
+3. **Launch PowerToys once** from the Start menu. The config installs it, but
+   PowerToys doesn't create `%LOCALAPPDATA%\Microsoft\PowerToys` until its first
+   run — so pass one skips the FancyZones step by design and tells you so.
+
+4. **Second pass** for FancyZones:
+
+   ```powershell
+   cd ~/git/Windows-Setup
+   .\bootstrap.ps1 -SkipProvision
+   ```
+
+5. **Assign a layout** — <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>`</kbd> opens the
+   editor. Pick an imported layout for the display, then verify:
+
+   - Win+Left / Right / Up / Down move between zones
+   - Win+Ctrl+Alt+0 / 1 / 4 apply the three layouts
+   - Win+Ctrl+Alt+Arrow spans a window across zones
+
 ### Already cloned
 
 ```powershell
