@@ -13,7 +13,7 @@ with the WSL phases removed, plus FancyZones layout import.
 On a bare machine, from a **normal (unelevated)** PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/floatingsidewalk/Windows-Setup/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/floatingsidewal/Windows-Setup/main/install.ps1 | iex
 ```
 
 That installs git if missing, creates `~/git`, clones this repo, and elevates
@@ -61,7 +61,6 @@ powertoys/
   Import-FancyZones.ps1        # enables FancyZones, imports layouts, overrides snap
   fancyzones/                  # drop custom-layouts.json etc. here (see below)
 dotfiles/                      # gitconfig, PS profile, Terminal settings
-bootstrap.ps1                  # provision + FancyZones in one shot
 ```
 
 ## What's different from upstream

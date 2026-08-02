@@ -6,7 +6,7 @@
 .DESCRIPTION
   Designed to run on a bare Windows 11 box via:
 
-    irm https://raw.githubusercontent.com/floatingsidewalk/Windows-Setup/main/install.ps1 | iex
+    irm https://raw.githubusercontent.com/floatingsidewal/Windows-Setup/main/install.ps1 | iex
 
   Must stay Windows PowerShell 5.1 compatible - pwsh 7 is not installed yet at
   the point this runs. No ternaries, no null-coalescing, no -AsHashtable.
@@ -25,11 +25,11 @@
   Clone only - skip running bootstrap.ps1.
 
 .EXAMPLE
-  irm https://raw.githubusercontent.com/floatingsidewalk/Windows-Setup/main/install.ps1 | iex
+  irm https://raw.githubusercontent.com/floatingsidewal/Windows-Setup/main/install.ps1 | iex
 
 .EXAMPLE
   # `irm | iex` cannot take arguments. To pass them, build a scriptblock:
-  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/floatingsidewalk/Windows-Setup/main/install.ps1))) -NoProvision
+  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/floatingsidewal/Windows-Setup/main/install.ps1))) -NoProvision
 #>
 #Requires -Version 5.1
 [CmdletBinding()]
@@ -42,7 +42,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $RepoName = 'Windows-Setup'
-$RepoUrl  = 'https://github.com/floatingsidewalk/Windows-Setup.git'
+$RepoUrl  = 'https://github.com/floatingsidewal/Windows-Setup.git'
 $Target   = Join-Path $Workspace $RepoName
 
 function Write-Step { param([string]$Text) Write-Host "`n==> $Text" -ForegroundColor Cyan }
@@ -70,7 +70,7 @@ function Get-GitPath {
 
 Write-Host ''
 Write-Host '  Windows-Setup installer' -ForegroundColor White
-Write-Host '  floatingsidewalk/Windows-Setup' -ForegroundColor DarkGray
+Write-Host '  floatingsidewal/Windows-Setup' -ForegroundColor DarkGray
 
 # --- git ----------------------------------------------------------------------
 Write-Step 'Checking for git'
