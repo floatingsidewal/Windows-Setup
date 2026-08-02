@@ -28,7 +28,9 @@ param(
     [switch]$SkipProvision,
     [switch]$SkipFancyZones,
     # Bindable as -m365; PowerShell parameter matching is case-insensitive.
-    [switch]$M365
+    [switch]$M365,
+    # Internal: set on the sudo-elevated re-invoke to prevent an elevation loop.
+    [switch]$NoElevate
 )
 
 $ErrorActionPreference = 'Stop'
@@ -73,7 +75,39 @@ $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $isAdmin  = ([Security.Principal.WindowsPrincipal]$identity).IsInRole(
                 [Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
-    throw 'Must run elevated. Open PowerShell as Administrator and re-run.'
+    # -NoElevate guards against a loop if the elevated child still reads as
+    # non-admin for any reason.
+    $sudo = Get-Command sudo.exe -ErrorAction SilentlyContinue
+
+    if ($NoElevate -or -not $sudo) {
+        throw @"
+Must run elevated. Either:
+  sudo .\bootstrap.ps1
+or open PowerShell as Administrator and re-run.
+"@
+    }
+
+    Write-Step 'Not elevated - re-invoking via sudo (a UAC prompt is expected)'
+
+    if (Get-Command pwsh -ErrorAction SilentlyContinue) { $shell = 'pwsh' }
+    else { $shell = 'powershell' }
+
+    # Forward every parameter explicitly. $PSCommandPath is not trusted here for
+    # the same reason $PSScriptRoot isn't - see the RepoRoot note above.
+    $fwd = @(
+        '-ExecutionPolicy', 'Bypass'
+        '-File', (Join-Path $RepoRoot 'bootstrap.ps1')
+        '-RepoRoot', $RepoRoot
+        '-FancyZonesSource', $FancyZonesSource
+        '-NoElevate'
+    )
+    if ($SkipProvision)  { $fwd += '-SkipProvision' }
+    if ($SkipFancyZones) { $fwd += '-SkipFancyZones' }
+    if ($M365)           { $fwd += '-M365' }
+    if ($WhatIfPreference) { $fwd += '-WhatIf' }
+
+    & $sudo.Source $shell @fwd
+    exit $LASTEXITCODE
 }
 
 if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
