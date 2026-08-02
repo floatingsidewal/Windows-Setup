@@ -55,7 +55,11 @@ resources:
 # Created first so nothing else has to assume it exists.
 # =============================================================================
 
-- type: Microsoft.DSC.Transitional/PowerShellScript
+# NOTE: WindowsPowerShellScript, not PowerShellScript. The latter is declared
+# with condition "[not(equals(tryWhich('pwsh'), null()))]" and executes via pwsh,
+# so it silently does not exist until PowerShell 7 is on PATH. This unit must run
+# on a bare machine, so it uses the 5.1 variant, which has no such condition.
+- type: Microsoft.DSC.Transitional/WindowsPowerShellScript
   name: GitWorkspaceDir
   properties:
     getScript: |

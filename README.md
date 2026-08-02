@@ -191,6 +191,44 @@ After importing, assign a layout to the display once via **Win+Shift+`**.
 Setting a default per orientation makes it stick automatically when the
 Parallels display resolution changes.
 
+## No Microsoft Store
+
+Every package resource pins `source: winget`. Nothing installs from msstore.
+
+MSIX is an installer *format*, not a source — `Microsoft.PowerShell` on ARM64
+ships as MSIX and lands in `WindowsApps`, but it still comes from the winget
+source. `winget list --source msstore` returns nothing.
+
+The one exception is `winget configure --enable`, which internally resolves an
+App Installer self-update through msstore (`ProductId: 9NBLGGH4NNS1`) and stalls
+until it lands. `bootstrap.ps1` pre-empts that with an explicit
+`winget upgrade --id Microsoft.AppInstaller --source winget` first.
+
+To rule the Store out entirely:
+
+```powershell
+winget source remove msstore     # elevated; reversible with: winget source reset
+```
+
+Nothing in this repo needs it.
+
+## Known: PowerShellScript units need a second pass
+
+`Microsoft.DSC.Transitional/PowerShellScript` is declared with
+`condition: "[not(equals(tryWhich('pwsh'), null()))]"` and executes via `pwsh`.
+On a bare machine PowerShell 7 does not exist yet, so every unit of that type
+reports **"Resource not found"** — `darkTheme`, the Cascadia font units,
+`ps7default`, the Copilot profile, the WinUI templates, and `OhMyPosh/Shell`.
+
+Since this config *installs* PowerShell 7, `bootstrap.ps1` detects that `pwsh`
+appeared during the run and automatically re-applies the config so those units
+resolve. Package and registry resources are unaffected — they have no such
+condition and land on the first pass.
+
+`GitWorkspaceDir` uses `WindowsPowerShellScript` (5.1, no condition) instead, so
+`~/git` is created on a bare machine. `bootstrap.ps1` also creates it directly,
+independent of DSC.
+
 ## Windows Terminal
 
 `dotfiles\Configure-Terminal.ps1` owns every `settings.json` edit, applied as one

@@ -70,6 +70,13 @@ $importer   = Join-Path $RepoRoot 'powertoys\Import-FancyZones.ps1'
 
 function Write-Step { param([string]$Text) Write-Host "`n==> $Text" -ForegroundColor Cyan }
 
+function Update-SessionPath {
+    # Pick up PATH changes made by installers without restarting the shell.
+    $machine = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+    $user    = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $env:Path = ($machine, $user | Where-Object { $_ }) -join ';'
+}
+
 # --- preflight ----------------------------------------------------------------
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $isAdmin  = ([Security.Principal.WindowsPrincipal]$identity).IsInRole(
@@ -114,6 +121,19 @@ if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
     throw 'winget not found. Install "App Installer" from the Microsoft Store first.'
 }
 
+# ~/git is where every repo lives. The config declares this too, but do it here
+# unconditionally so it never depends on a DSC resource resolving.
+$workspace = Join-Path $env:USERPROFILE 'git'
+if (Test-Path $workspace -PathType Leaf) {
+    throw "A file exists at $workspace - move it before provisioning."
+}
+if (-not (Test-Path $workspace -PathType Container)) {
+    if ($PSCmdlet.ShouldProcess($workspace, 'Create workspace directory')) {
+        New-Item -ItemType Directory -Path $workspace -Force | Out-Null
+        Write-Step "Created workspace: $workspace"
+    }
+}
+
 # --- provision ----------------------------------------------------------------
 if (-not $SkipProvision) {
     if (-not (Test-Path $configFile)) { throw "Config not found: $configFile" }
@@ -122,9 +142,12 @@ if (-not $SkipProvision) {
     # from the Microsoft Store and does not complete until that lands - which
     # looks exactly like a silent hang. Get the update out of the way first.
     # A non-zero exit here just means "already current", so it is not checked.
-    Write-Step 'Ensuring App Installer is current'
+    # --source winget is deliberate: left implicit, winget resolves this through
+    # msstore. Every package in this repo is winget-sourced; this keeps the one
+    # bootstrap-time dependency on the same footing.
+    Write-Step 'Ensuring App Installer is current (winget source, not msstore)'
     if ($PSCmdlet.ShouldProcess('Microsoft.AppInstaller', 'upgrade')) {
-        winget upgrade --id Microsoft.AppInstaller `
+        winget upgrade --id Microsoft.AppInstaller --source winget `
             --accept-package-agreements --accept-source-agreements --disable-interactivity
     }
 
@@ -159,11 +182,35 @@ configuration can be enabled. Try:
         }
     }
 
+    # Microsoft.DSC.Transitional/PowerShellScript is declared with
+    # condition "[not(equals(tryWhich('pwsh'), null()))]" and runs via pwsh. On a
+    # bare machine pwsh does not exist yet, so every unit of that type reports
+    # "Resource not found" - darkTheme, the Cascadia font units, ps7default, the
+    # Copilot profile, the WinUI templates. This config INSTALLS PowerShell 7, so
+    # a second pass in a process that can see pwsh makes them resolve.
+    $pwshBefore = [bool](Get-Command pwsh -ErrorAction SilentlyContinue)
+
     Write-Step 'Applying configuration (this takes a while)'
     if ($PSCmdlet.ShouldProcess($configFile, 'apply')) {
         winget configure -f $configFile --accept-configuration-agreements --disable-interactivity
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "winget configure exited $LASTEXITCODE - review the output above."
+        }
+
+        Update-SessionPath
+        $pwshAfter = [bool](Get-Command pwsh -ErrorAction SilentlyContinue)
+
+        if (-not $pwshBefore -and $pwshAfter) {
+            Write-Step 'PowerShell 7 was just installed - re-applying so pwsh-dependent units run'
+            winget configure -f $configFile --accept-configuration-agreements --disable-interactivity
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Second pass exited $LASTEXITCODE - review the output above."
+            }
+        } elseif (-not $pwshAfter) {
+            Write-Warning @"
+pwsh is still not available. Units of type Microsoft.DSC.Transitional/PowerShellScript
+will not have run. Open a NEW elevated shell and re-run: .\bootstrap.ps1
+"@
         }
     }
 } else {
