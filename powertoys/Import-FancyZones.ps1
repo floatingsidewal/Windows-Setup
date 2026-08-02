@@ -121,10 +121,15 @@ if (Test-Path $rootJson) {
 #                                          span multiple zones). Without it only
 #                                          Win+Left / Win+Right are overridden.
 # fancyzones_moveWindowAcrossMonitors -> cycle through zones on all monitors
+# fancyzones_quickLayoutSwitch        -> required for the Win+Ctrl+Alt+<n>
+#                                        bindings in layout-hotkeys.json to fire.
+#                                        Without it the hotkeys import but stay
+#                                        inert.
 $desired = @{
-    fancyzones_overrideSnapHotkeys       = $true
+    fancyzones_overrideSnapHotkeys        = $true
     fancyzones_moveWindowsBasedOnPosition = $true
     fancyzones_moveWindowAcrossMonitors   = $true
+    fancyzones_quickLayoutSwitch          = $true
 }
 
 if (-not (Test-Path $fzJson)) {

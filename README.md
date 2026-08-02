@@ -102,9 +102,19 @@ layout files, sets three settings, and restarts it:
 | `fancyzones_overrideSnapHotkeys` | Win+Arrow moves between zones |
 | `fancyzones_moveWindowsBasedOnPosition` | Relative position — overrides **all four** arrows, enables Win+Ctrl+Alt+Arrow to span zones |
 | `fancyzones_moveWindowAcrossMonitors` | Arrows cycle across all monitors |
+| `fancyzones_quickLayoutSwitch` | Enables the Win+Ctrl+Alt+`<n>` layout bindings |
 
 Without `moveWindowsBasedOnPosition`, only Win+Left / Win+Right get overridden
 and Win+Up / Win+Down keep native Windows behavior.
+
+Without `quickLayoutSwitch`, `layout-hotkeys.json` imports but the bindings never
+fire. Current bindings:
+
+| Hotkey | Layout |
+| --- | --- |
+| Win+Ctrl+Alt+0 | Priority Grid (1) |
+| Win+Ctrl+Alt+1 | Big 4 and Middle |
+| Win+Ctrl+Alt+4 | Big 4 |
 
 ### Populating `powertoys/fancyzones/`
 
