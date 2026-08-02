@@ -112,10 +112,17 @@ configuration can be enabled. Try:
         }
     }
 
-    Write-Step 'Validating configuration'
+    # ADVISORY ONLY - do not gate on this.
+    # `winget configure validate` exits 1 for purely informational notes such as
+    # "The module was not provided" and "not available publicly", which every
+    # unit in this config produces (upstream's included). Treating non-zero as
+    # fatal aborts every run. The real gate is the apply below.
+    Write-Step 'Validating configuration (advisory)'
     if ($PSCmdlet.ShouldProcess($configFile, 'validate')) {
         winget configure validate -f $configFile
-        if ($LASTEXITCODE -ne 0) { throw "Validation failed (exit $LASTEXITCODE)." }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "    validate exited $LASTEXITCODE - typically warnings only, continuing." -ForegroundColor DarkGray
+        }
     }
 
     Write-Step 'Applying configuration (this takes a while)'
@@ -135,10 +142,12 @@ configuration can be enabled. Try:
 if ($M365) {
     if (-not (Test-Path $m365File)) { throw "M365 config not found: $m365File" }
 
-    Write-Step 'Validating M365 configuration'
+    Write-Step 'Validating M365 configuration (advisory)'
     if ($PSCmdlet.ShouldProcess($m365File, 'validate')) {
         winget configure validate -f $m365File
-        if ($LASTEXITCODE -ne 0) { throw "M365 validation failed (exit $LASTEXITCODE)." }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "    validate exited $LASTEXITCODE - typically warnings only, continuing." -ForegroundColor DarkGray
+        }
     }
 
     Write-Step 'Installing OneDrive and Microsoft 365 Apps (large download)'
