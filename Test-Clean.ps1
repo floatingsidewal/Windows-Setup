@@ -63,7 +63,8 @@ foreach ($f in $files) {
     }
 
     # Skip binaries.
-    if ($f.Extension -in '.png','.jpg','.ico','.zip','.exe','.dll','.ttf') { continue }
+    if ($f.Extension -in '.png','.jpg','.ico','.zip','.exe','.dll','.ttf',
+                         '.mp3','.wav','.m4a') { continue }
 
     $lineNo = 0
     foreach ($line in [System.IO.File]::ReadAllLines($f.FullName)) {

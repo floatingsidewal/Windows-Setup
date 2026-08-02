@@ -129,6 +129,22 @@ if ($M365) {
     Write-Step 'Skipping M365 (pass -m365 to install OneDrive + Microsoft 365 Apps)'
 }
 
+# --- Bell sounds --------------------------------------------------------------
+# Ahead of FancyZones, because -SkipFancyZones returns early.
+Write-Step 'Deploying bell sound pack'
+$soundsSource = Join-Path $RepoRoot '.sounds'
+$soundsScript = Join-Path $RepoRoot 'dotfiles\Install-Sounds.ps1'
+
+if (-not (Test-Path $soundsSource)) {
+    Write-Warning "No .sounds directory at $soundsSource - skipping."
+} elseif (-not (Test-Path $soundsScript)) {
+    Write-Warning "Install-Sounds.ps1 not found at $soundsScript - skipping."
+} else {
+    $soundArgs = @{ SourcePath = $soundsSource }
+    if ($PSBoundParameters.ContainsKey('WhatIf')) { $soundArgs['WhatIf'] = $true }
+    & $soundsScript @soundArgs
+}
+
 # --- FancyZones ---------------------------------------------------------------
 if ($SkipFancyZones) {
     Write-Step 'Skipping FancyZones (-SkipFancyZones)'

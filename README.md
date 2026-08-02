@@ -118,7 +118,9 @@ config/
 powertoys/
   Import-FancyZones.ps1        # enables FancyZones, imports layouts, overrides snap
   fancyzones/                  # drop custom-layouts.json etc. here (see below)
-dotfiles/                      # gitconfig, PS profile, Terminal settings
+dotfiles/
+  Install-Sounds.ps1           # deploys .sounds -> ~/.sounds, sets Terminal bell
+.sounds/                       # bell sound pack (tracked on purpose)
 ```
 
 ## What's different from upstream
@@ -188,6 +190,32 @@ monitor hardware IDs and won't match a different display. They're gitignored.
 After importing, assign a layout to the display once via **Win+Shift+`**.
 Setting a default per orientation makes it stick automatically when the
 Parallels display resolution changes.
+
+## Bell sounds
+
+`.sounds/` is deployed to `~/.sounds` and wired into Windows Terminal's
+**Defaults | Advanced | Bell sound**. Terminal's `bellSound` accepts an array and
+picks one at random per bell, so the whole pack becomes the bell.
+
+Deployed to the home folder rather than referenced in place — a path into the
+repo clone breaks the moment the clone moves or is deleted.
+
+The pack ships most sounds as both `.mp3` and `.wav`. Listing both would weight
+those sounds double in the random pool, so the array is deduplicated by base
+name, preferring `.wav` (override with `-PreferFormat`). 31 files currently
+collapse to 16 unique sounds.
+
+```powershell
+.\dotfiles\Install-Sounds.ps1 -SourcePath .\.sounds -WhatIf   # dry run
+.\dotfiles\Install-Sounds.ps1 -SourcePath .\.sounds
+```
+
+`bellStyle` is left alone — it defaults to `"audible"`, which plays the sound.
+The script warns if it's set to something that would suppress audio.
+
+Two caveats: `settings.json` is JSONC, and rewriting it **does not preserve
+comments** (a `.bak` is written first). And if Terminal has never been launched,
+the script seeds `settings.json` in `LocalState` rather than failing.
 
 ## Public repo hygiene
 

@@ -47,8 +47,5 @@ credentials*
 Thumbs.db
 desktop.ini
 
-# Unrelated assets that landed in the repo directory - not part of this project.
-.sounds/
-*.mp3
-*.wav
-*.m4a
+# NOTE: .sounds/ is INTENTIONALLY tracked - it is the Windows Terminal bell
+# sound pack, deployed to ~/.sounds by dotfiles\Install-Sounds.ps1.
