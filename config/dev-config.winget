@@ -51,6 +51,29 @@ resources:
 # ---------------------------------------------------------------------------
 
 # =============================================================================
+# Workspace — ~/git holds every cloned repo and is the default working dir.
+# Created first so nothing else has to assume it exists.
+# =============================================================================
+
+- type: Microsoft.DSC.Transitional/PowerShellScript
+  name: GitWorkspaceDir
+  properties:
+    getScript: |
+      $path = Join-Path $env:USERPROFILE 'git'
+      return @{ path = $path; exists = (Test-Path $path -PathType Container) }
+    testScript: |
+      return (Test-Path (Join-Path $env:USERPROFILE 'git') -PathType Container)
+    setScript: |
+      $path = Join-Path $env:USERPROFILE 'git'
+      if (Test-Path $path -PathType Leaf) {
+        throw "GitWorkspaceDir: a FILE exists at $path - move it before provisioning."
+      }
+      New-Item -ItemType Directory -Path $path -Force | Out-Null
+      Write-Host "Workspace ready: $path"
+  metadata:
+    description: Create ~/git workspace directory for all repos
+
+# =============================================================================
 # Terminal and PowerShell 7
 # =============================================================================
 

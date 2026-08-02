@@ -34,6 +34,11 @@ bootstrap.ps1                  # provision + FancyZones in one shot
 
 ## What's different from upstream
 
+**`~/git` is created first.** Every repo gets cloned under `~/git`, and it's the
+default working directory. The `GitWorkspaceDir` resource runs ahead of
+everything else so nothing downstream has to assume it exists. It's idempotent,
+and errors out rather than clobbering if a *file* happens to sit at that path.
+
 **WSL Phases 1-3 are removed.** This is a Parallels guest, so nested virt is a
 non-starter — and upstream's Phase 2 (`RebootForVmp`) calls `Restart-Computer
 -Force` mid-run, rebooting the machine to activate Virtual Machine Platform.
