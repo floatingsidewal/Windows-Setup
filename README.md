@@ -13,7 +13,7 @@ with the WSL phases removed, plus FancyZones layout import.
 From an **elevated** PowerShell:
 
 ```powershell
-git clone https://github.com/floatingsidewal/Windows-Setup.git ~/git/Windows-Setup
+git clone https://github.com/floatingsidewalk/Windows-Setup.git ~/git/Windows-Setup
 cd ~/git/Windows-Setup
 .\bootstrap.ps1 -WhatIf     # dry run
 .\bootstrap.ps1
