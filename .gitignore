@@ -1,0 +1,48 @@
+# =============================================================================
+# This repo is PUBLIC. Anything matching below leaks a username, a hardware
+# serial, or a credential. Run .\Test-Clean.ps1 before pushing.
+# =============================================================================
+
+# --- FancyZones: machine-specific AND identifying -----------------------------
+# applied-layouts.json embeds monitor device IDs, which include display serial
+# numbers. app-zone-history.json embeds full exe paths, which include
+# C:\Users\<username>. Neither transfers to another machine anyway.
+powertoys/fancyzones/applied-layouts.json
+powertoys/fancyzones/app-zone-history.json
+
+# --- PowerToys settings dumps -------------------------------------------------
+# Full module settings / backup zips carry user paths and per-module state.
+powertoys/settings.json
+powertoys/**/backup*.zip
+powertoys/**/PowerToys*.zip
+
+# --- Backups produced by Import-FancyZones.ps1 --------------------------------
+# These are copies of LIVE config, so they carry whatever the live files carry.
+*.bak
+*.bak-*/
+**/FancyZones.bak-*/
+
+# --- Dotfiles that commonly carry identity ------------------------------------
+# Commit sanitized templates (e.g. gitconfig.template) instead of the real file.
+dotfiles/.gitconfig
+dotfiles/gitconfig
+dotfiles/**/settings.json
+!dotfiles/**/*.template
+!dotfiles/**/*.example
+
+# --- Credentials --------------------------------------------------------------
+*.key
+*.pem
+*.pfx
+*.p12
+*_rsa
+*_ed25519
+.env
+.env.*
+secrets/
+credentials*
+*.credentials
+
+# --- Noise --------------------------------------------------------------------
+Thumbs.db
+desktop.ini
