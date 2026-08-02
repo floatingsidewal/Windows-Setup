@@ -7,9 +7,14 @@
   Must run elevated - most resources in config\dev-config.winget declare
   securityContext: elevated, and `winget configure --enable` requires admin.
 
+.PARAMETER RepoRoot
+  Root of this repo. Normally inferred, but pass it explicitly when the caller
+  cannot guarantee $PSScriptRoot is populated - Windows `sudo` inline mode runs
+  the script with $PSScriptRoot empty even though -File resolved correctly.
+
 .PARAMETER FancyZonesSource
   Folder holding custom-layouts.json etc. Defaults to powertoys\fancyzones
-  in this repo.
+  under RepoRoot.
 
 .EXAMPLE
   .\bootstrap.ps1 -WhatIf          # dry run, changes nothing
@@ -18,15 +23,45 @@
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [string]$FancyZonesSource = (Join-Path $PSScriptRoot 'powertoys\fancyzones'),
+    [string]$RepoRoot,
+    [string]$FancyZonesSource,
     [switch]$SkipProvision,
     [switch]$SkipFancyZones
 )
 
 $ErrorActionPreference = 'Stop'
 
-$configFile = Join-Path $PSScriptRoot 'config\dev-config.winget'
-$importer   = Join-Path $PSScriptRoot 'powertoys\Import-FancyZones.ps1'
+# --- locate the repo ----------------------------------------------------------
+# $PSScriptRoot is NOT reliable here. Under `sudo` inline mode it comes back
+# empty, which silently poisoned Join-Path in the param block. Resolve through a
+# fallback chain and verify the result actually looks like this repo.
+if (-not $RepoRoot) {
+    $candidates = @(
+        $PSScriptRoot
+        if ($MyInvocation.MyCommand.Path) { Split-Path -Parent $MyInvocation.MyCommand.Path }
+        (Get-Location).Path
+    )
+    foreach ($c in $candidates) {
+        if ($c -and (Test-Path (Join-Path $c 'config\dev-config.winget'))) {
+            $RepoRoot = $c
+            break
+        }
+    }
+}
+
+if (-not $RepoRoot -or -not (Test-Path (Join-Path $RepoRoot 'config\dev-config.winget'))) {
+    throw @"
+Could not locate the repo root. Re-run from the repo directory, or pass it:
+  .\bootstrap.ps1 -RepoRoot C:\Users\<you>\git\Windows-Setup
+"@
+}
+
+if (-not $FancyZonesSource) {
+    $FancyZonesSource = Join-Path $RepoRoot 'powertoys\fancyzones'
+}
+
+$configFile = Join-Path $RepoRoot 'config\dev-config.winget'
+$importer   = Join-Path $RepoRoot 'powertoys\Import-FancyZones.ps1'
 
 function Write-Step { param([string]$Text) Write-Host "`n==> $Text" -ForegroundColor Cyan }
 

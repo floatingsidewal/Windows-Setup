@@ -140,9 +140,13 @@ $isAdmin  = ([Security.Principal.WindowsPrincipal]$identity).IsInRole(
 if (Get-Command pwsh -ErrorAction SilentlyContinue) { $shell = 'pwsh' }
 else { $shell = 'powershell' }
 
+# RepoRoot is passed explicitly to every branch below. Windows `sudo` inline mode
+# runs the script with $PSScriptRoot empty even though -File resolved fine, so
+# bootstrap.ps1 cannot infer its own location reliably.
+
 if ($isAdmin) {
     Write-Step 'Already elevated - running bootstrap.ps1 here'
-    & $bootstrap
+    & $bootstrap -RepoRoot $Target
     return
 }
 
@@ -153,7 +157,7 @@ $sudo = Get-Command sudo.exe -ErrorAction SilentlyContinue
 
 if ($sudo) {
     Write-Step 'Elevating via sudo (a UAC prompt is expected)'
-    & $sudo.Source $shell -ExecutionPolicy Bypass -File $bootstrap
+    & $sudo.Source $shell -ExecutionPolicy Bypass -File $bootstrap -RepoRoot $Target
     if ($LASTEXITCODE -eq 0) { return }
     Write-Warning "sudo returned $LASTEXITCODE - falling back to a separate elevated window."
 }
@@ -164,5 +168,6 @@ Start-Process -FilePath $shell -Verb RunAs -ArgumentList @(
     '-NoExit'
     '-ExecutionPolicy', 'Bypass'
     '-File', "`"$bootstrap`""
+    '-RepoRoot', "`"$Target`""
 )
 Write-Ok 'elevated window launched - watch it for progress'
