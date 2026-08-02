@@ -10,18 +10,50 @@ with the WSL phases removed, plus FancyZones layout import.
 
 ## Quick start
 
-From an **elevated** PowerShell:
+On a bare machine, from a **normal (unelevated)** PowerShell:
 
 ```powershell
-git clone https://github.com/floatingsidewalk/Windows-Setup.git ~/git/Windows-Setup
+irm https://raw.githubusercontent.com/floatingsidewalk/Windows-Setup/main/install.ps1 | iex
+```
+
+That installs git if missing, creates `~/git`, clones this repo, and elevates
+into `bootstrap.ps1`. Run it unelevated — it elevates only for provisioning, and
+it elevates a local file rather than re-piping remote code into an admin shell.
+
+### Prerequisites
+
+Only two commands are assumed to have run first:
+
+```powershell
+sudo config --enable normal            # inline elevation
+Set-ExecutionPolicy RemoteSigned       # allow local scripts
+```
+
+`RemoteSigned` is enough: `irm | iex` isn't governed by execution policy at all
+(it's never a file on disk), and `git clone` doesn't apply mark-of-the-web to
+what it writes, so the cloned scripts run without needing `Unblock-File`.
+
+`install.ps1` prefers `sudo` for inline elevation so provisioning output stays
+in one window, and falls back to a separate elevated window if `sudo` is
+unavailable.
+
+### Already cloned
+
+```powershell
 cd ~/git/Windows-Setup
 .\bootstrap.ps1 -WhatIf     # dry run
-.\bootstrap.ps1
+.\bootstrap.ps1             # needs elevation
 ```
+
+Re-running `install.ps1` on an existing clone does a `git pull --ff-only`, so
+local commits are never silently discarded.
 
 ## Layout
 
 ```
+install.ps1                    # irm | iex entry point: git -> clone -> elevate
+bootstrap.ps1                  # provision + FancyZones
+Test-Clean.ps1                 # PII/secret scanner, exits 1 on findings
 config/
   dev-config.winget            # what actually runs - WSL removed
   dev-config.upstream.winget   # pristine upstream copy, for diffing on update
