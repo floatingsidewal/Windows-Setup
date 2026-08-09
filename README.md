@@ -1,9 +1,11 @@
 # Windows-Setup
 
-Repeatable provisioning for a Windows 11 dev box (running as a Parallels guest).
+Repeatable provisioning for a Windows 11 dev box, on a Parallels guest or on
+real hardware.
 
-Wraps [microsoft/WindowsDeveloperConfig](https://github.com/microsoft/WindowsDeveloperConfig)
-with the WSL phases removed, plus FancyZones layout import.
+Wraps [microsoft/WindowsDeveloperConfig](https://github.com/microsoft/WindowsDeveloperConfig),
+plus FancyZones layout import. The machine is detected at run time and one of
+two modes applies — see [Modes](#modes).
 
 > Public repo. Run `.\Test-Clean.ps1` before every push — see
 > [Public repo hygiene](#public-repo-hygiene).
@@ -59,11 +61,16 @@ unavailable.
    the winget config, then imports FancyZones and starts PowerToys. Single pass.
    This is the long step.
 
+   On a **Native** machine it then applies the native overlay and reboots to
+   activate Virtual Machine Platform, resuming itself after you log back in to
+   install Ubuntu and Docker Desktop. Pass `-NoReboot` to stay put. See
+   [Modes](#modes).
+
 3. **Assign a layout** — <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>`</kbd> opens the
    editor. Pick an imported layout for the display, then verify:
 
    - Win+Left / Right / Up / Down move between zones
-   - Win+Ctrl+Alt+0 / 1 / 4 apply the three layouts
+   - Win+Ctrl+Alt+0 / 1 / 3 / 4 apply the four layouts
    - Win+Ctrl+Alt+Arrow spans a window across zones
 
    Layout-to-monitor assignment is the one genuinely manual step: it's keyed to
@@ -94,10 +101,27 @@ winget configure -f config\m365.winget --accept-configuration-agreements --disab
 Microsoft 365 Apps is a large Click-to-Run download and will dominate the
 runtime of a `-m365` pass.
 
+### Optional: dark theme
+
+Dark mode is **not** forced by default — it used to be, unconditionally, as part
+of the base config. Opt in with `-DarkTheme`:
+
+```powershell
+cd ~/git/Windows-Setup
+.\bootstrap.ps1 -DarkTheme
+```
+
+It lives in `config/theme.winget` and can be applied standalone:
+
+```powershell
+winget configure -f config\theme.winget --accept-configuration-agreements --disable-interactivity
+```
+
 ### Already cloned
 
 ```powershell
 cd ~/git/Windows-Setup
+.\bootstrap.ps1 -DetectOnly # report the detected mode, change nothing
 .\bootstrap.ps1 -WhatIf     # dry run
 .\bootstrap.ps1             # needs elevation
 ```
@@ -105,15 +129,98 @@ cd ~/git/Windows-Setup
 Re-running `install.ps1` on an existing clone does a `git pull --ff-only`, so
 local commits are never silently discarded.
 
+## Modes
+
+The machine is detected at run time by `lib\Get-MachineProfile.ps1` and one of
+two modes applies.
+
+| Mode | When | What it adds |
+| --- | --- | --- |
+| **Parallels** | SMBIOS or the `prl_*` services say this is a Parallels guest | Nothing — `config\dev-config.winget` only |
+| **Native** | Anything else: bare metal, or a VM on another hypervisor | `config\native.winget` + `config\native-post.winget` on top |
+
+Check what this box reads as without changing anything:
+
+```powershell
+.\bootstrap.ps1 -DetectOnly
+```
+
+Override the detection either way:
+
+```powershell
+.\bootstrap.ps1 -Mode Native      # force the full stack
+.\bootstrap.ps1 -Mode Parallels   # force the lean profile
+```
+
+### What Native adds
+
+- **WSL 2 + Ubuntu** — the three upstream phases this repo used to delete
+- **Docker Desktop** — WSL2 backend, so it depends on the distro existing
+- **Hyper-V, Containers, Windows Sandbox** — Pro/Enterprise/Education only
+- **Sysinternals**
+
+Detection also degrades on its own: a Home edition skips Hyper-V and Sandbox
+rather than failing, and a machine with no visible virtualization extensions
+gets a warning before anything is attempted.
+
+### The reboot
+
+Virtual Machine Platform is not active until the machine restarts, and nothing
+WSL-hosted can install before it is. So a first Native run reboots — with a
+20-second countdown you can Ctrl+C — registers a `RunOnce` key, and resumes
+itself after you log back in (one UAC prompt). The resume applies
+`native-post.winget`, which installs Ubuntu and Docker Desktop.
+
+To stay put instead:
+
+```powershell
+.\bootstrap.ps1 -NoReboot     # install WSL components, do not restart
+# ...reboot when convenient, then:
+.\bootstrap.ps1 -Resume       # finish: Ubuntu + Docker Desktop
+```
+
+Upstream puts its reboot in the *middle* of the DSC apply, via a `RebootForVmp`
+resource that calls `Restart-Computer -Force` from inside a `setScript` and then
+throws so DSC marks the run failed. This repo keeps the auto-reboot and the
+`RunOnce` resume but moves both into `bootstrap.ps1`, ordered **after** the base
+config, Terminal and FancyZones. Rebooting mid-apply means an interrupted resume
+costs the entire provision; rebooting at the end costs only the WSL/Docker half.
+
+### WSL does not need Hyper-V
+
+A common mix-up worth stating plainly: **WSL 2 requires
+`VirtualMachinePlatform`, not Hyper-V.** VMP registers the same `vmcompute`
+(Host Compute Service) plumbing WSL 2 runs on, without the Hyper-V role, the
+virtual switch stack, or Hyper-V Manager. Hyper-V is enabled in Native mode
+because a real machine is the one place it is useful, not because WSL needs it —
+drop `Microsoft-Hyper-V-All` from `config\native.winget` and WSL and Docker are
+unaffected.
+
+Note also that `Microsoft-Hyper-V` and `Microsoft-Hyper-V-All` are different
+features, and that the `-All` switch on `Enable-WindowsOptionalFeature` enables a
+feature's **parents**, not its children:
+
+| Command | Result |
+| --- | --- |
+| `Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All` | Hypervisor and services, **no** Manager GUI or PowerShell module |
+| `Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -All` | Hypervisor **plus** Hyper-V Manager and the PowerShell module |
+
+`config\native.winget` uses the second.
+
 ## Layout
 
 ```
 install.ps1                    # irm | iex entry point: git -> clone -> elevate
-bootstrap.ps1                  # provision + FancyZones
+bootstrap.ps1                  # detect mode -> provision -> FancyZones -> native extras
 Test-Clean.ps1                 # PII/secret scanner, exits 1 on findings
+lib/
+  Get-MachineProfile.ps1       # Parallels vs Native detection (-DetectOnly)
 config/
-  dev-config.winget            # what actually runs - WSL removed
+  dev-config.winget            # base, both modes - WSL removed
   dev-config.upstream.winget   # pristine upstream copy, for diffing on update
+  native.winget                # NATIVE: virtualization features + WSL components
+  native-post.winget           # NATIVE, post-reboot: Ubuntu distro + Docker Desktop
+  theme.winget                 # OPT-IN: force dark mode (-DarkTheme)
   m365.winget                  # OPT-IN: OneDrive + Microsoft 365 Apps (-m365)
 powertoys/
   Import-FancyZones.ps1        # enables FancyZones, imports layouts, overrides snap
@@ -130,11 +237,31 @@ default working directory. The `GitWorkspaceDir` resource runs ahead of
 everything else so nothing downstream has to assume it exists. It's idempotent,
 and errors out rather than clobbering if a *file* happens to sit at that path.
 
-**WSL Phases 1-3 are removed.** This is a Parallels guest, so nested virt is a
-non-starter — and upstream's Phase 2 (`RebootForVmp`) calls `Restart-Computer
--Force` mid-run, rebooting the machine to activate Virtual Machine Platform.
-Nothing else in the file had a `dependsOn` pointing at the WSL resources, so it
-cuts cleanly (962 → 909 lines).
+**WSL Phases 1-3 are removed from the base config.** A Parallels guest has no
+nested virt, and upstream's Phase 2 (`RebootForVmp`) calls `Restart-Computer
+-Force` mid-run. Nothing else in the file had a `dependsOn` pointing at the WSL
+resources, so it cut cleanly (962 → 909 lines). They are **not** gone from the
+repo — they were rebuilt into `config/native.winget` and
+`config/native-post.winget`, which Native mode applies. See
+[Modes](#modes).
+
+**Dark theme is opt-in.** Upstream's `darkTheme` unit ran on every provision and
+forced dark mode with no way to decline. It now lives in `config/theme.winget`
+and only applies with `-DarkTheme`.
+
+**Edge searches Google, not Bing.** Four `DefaultSearchProvider*` policy values
+under `HKLM\SOFTWARE\Policies\Microsoft\Edge`. There is no user-preference
+registry value for this — Edge keeps the chosen engine in the profile's Web Data
+database — so policy is the only declarative route. The trade-off: a
+policy-set provider is *enforced*, so `edge://settings/searchEngines` shows it as
+managed and the dropdown is locked. Delete the four `EdgeSearchProvider*`
+resources to hand the choice back to the UI.
+
+**Claude and Copilot are installed.** `Anthropic.ClaudeCode`,
+`Anthropic.Claude`, and both halves of GitHub Copilot — `GitHub.Copilot` (the
+CLI, which `AddWinSkillsMarketplace` and `InstallWinUIPlugin` drive) and
+`GitHub.CopilotApp` (the desktop app). They are separate packages; installing
+the CLI does not give you the app.
 
 Everything else upstream installs is kept: Windows Terminal, PowerShell 7, Git,
 GitHub CLI + Copilot, VS Code, .NET SDK 10, Python 3.14 + uv, Node LTS + NVM,
@@ -170,11 +297,12 @@ and Win+Up / Win+Down keep native Windows behavior.
 Without `quickLayoutSwitch`, `layout-hotkeys.json` imports but the bindings never
 fire. Current bindings:
 
-| Hotkey | Layout |
-| --- | --- |
-| Win+Ctrl+Alt+0 | Priority Grid (1) |
-| Win+Ctrl+Alt+1 | Big 4 and Middle |
-| Win+Ctrl+Alt+4 | Big 4 |
+| Hotkey | Layout | Shape |
+| --- | --- | --- |
+| Win+Ctrl+Alt+0 | Priority Grid (1) | 3 columns, 25 / 50 / 25 |
+| Win+Ctrl+Alt+1 | Big 4 and Middle | canvas: 4 columns plus a wide middle zone |
+| Win+Ctrl+Alt+3 | Big 3 | 3 equal columns |
+| Win+Ctrl+Alt+4 | Big 4 | 4 equal columns |
 
 ### Populating `powertoys/fancyzones/`
 

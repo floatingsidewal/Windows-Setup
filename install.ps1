@@ -24,6 +24,11 @@
 .PARAMETER NoProvision
   Clone only - skip running bootstrap.ps1.
 
+.PARAMETER Mode
+  Auto (default), Parallels, or Native. Auto lets bootstrap.ps1 detect the
+  machine: a Parallels guest gets the lean profile, anything else additionally
+  gets WSL + Ubuntu, Docker Desktop, Hyper-V and Windows Sandbox.
+
 .EXAMPLE
   irm https://raw.githubusercontent.com/floatingsidewal/Windows-Setup/main/install.ps1 | iex
 
@@ -38,7 +43,16 @@ param(
     [string]$Workspace = (Join-Path $env:USERPROFILE 'git'),
     [switch]$NoProvision,
     # Bindable as -m365; PowerShell parameter matching is case-insensitive.
-    [switch]$M365
+    [switch]$M365,
+
+    [ValidateSet('Auto', 'Parallels', 'Native')]
+    [string]$Mode = 'Auto',
+
+    # Dark mode is opt-in - it is no longer part of the base config.
+    [switch]$DarkTheme,
+
+    # Native mode only: install the WSL components but do not reboot.
+    [switch]$NoReboot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -146,12 +160,34 @@ else { $shell = 'powershell' }
 # runs the script with $PSScriptRoot empty even though -File resolved fine, so
 # bootstrap.ps1 cannot infer its own location reliably.
 
-if ($M365) { Write-Host '    M365 requested - OneDrive + Microsoft 365 Apps will be installed' -ForegroundColor DarkGray }
+if ($M365)     { Write-Host '    M365 requested - OneDrive + Microsoft 365 Apps will be installed' -ForegroundColor DarkGray }
+if ($DarkTheme){ Write-Host '    Dark theme requested' -ForegroundColor DarkGray }
+if ($NoReboot) { Write-Host '    -NoReboot: WSL components install but the machine will not restart' -ForegroundColor DarkGray }
+
+# Built once and reused by all three launch paths below. Adding a switch here
+# used to mean adding an if/else to each branch, which does not scale.
+$passthru = @()
+if ($Mode -ne 'Auto') { $passthru += @('-Mode', $Mode) }
+if ($M365)            { $passthru += '-M365' }
+if ($DarkTheme)       { $passthru += '-DarkTheme' }
+if ($NoReboot)        { $passthru += '-NoReboot' }
+
+# bootstrap.ps1 reports the detected mode itself, but say something here too so
+# the unelevated window shows it even when provisioning detaches into its own.
+if ($Mode -eq 'Auto') {
+    $profileLib = Join-Path $Target 'lib\Get-MachineProfile.ps1'
+    if (Test-Path $profileLib) {
+        . $profileLib
+        $detected = Get-MachineProfile
+        Write-Host "    detected mode: $($detected.Mode) ($($detected.Platform))" -ForegroundColor DarkGray
+    }
+} else {
+    Write-Host "    mode: $Mode (forced)" -ForegroundColor DarkGray
+}
 
 if ($isAdmin) {
     Write-Step 'Already elevated - running bootstrap.ps1 here'
-    if ($M365) { & $bootstrap -RepoRoot $Target -M365 }
-    else       { & $bootstrap -RepoRoot $Target }
+    & $bootstrap -RepoRoot $Target @passthru
     return
 }
 
@@ -162,8 +198,7 @@ $sudo = Get-Command sudo.exe -ErrorAction SilentlyContinue
 
 if ($sudo) {
     Write-Step 'Elevating via sudo (a UAC prompt is expected)'
-    if ($M365) { & $sudo.Source $shell -ExecutionPolicy Bypass -File $bootstrap -RepoRoot $Target -M365 }
-    else       { & $sudo.Source $shell -ExecutionPolicy Bypass -File $bootstrap -RepoRoot $Target }
+    & $sudo.Source $shell -ExecutionPolicy Bypass -File $bootstrap -RepoRoot $Target @passthru
     if ($LASTEXITCODE -eq 0) { return }
     Write-Warning "sudo returned $LASTEXITCODE - falling back to a separate elevated window."
 }
@@ -176,6 +211,6 @@ $bootstrapArgs = @(
     '-File', "`"$bootstrap`""
     '-RepoRoot', "`"$Target`""
 )
-if ($M365) { $bootstrapArgs += '-M365' }
+$bootstrapArgs += $passthru
 Start-Process -FilePath $shell -Verb RunAs -ArgumentList $bootstrapArgs
 Write-Ok 'elevated window launched - watch it for progress'

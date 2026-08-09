@@ -102,30 +102,10 @@ resources:
     description: Install PowerShell 7
 
 # =============================================================================
-# Force dark theme
-# Uses app and system theme registry values to detect dark theme.
+# Dark theme MOVED OUT of the base config — it now lives in config\theme.winget
+# and is opt-in via `.\bootstrap.ps1 -DarkTheme`. It ran unconditionally here,
+# which meant every fresh provision forced dark mode with no way to decline.
 # =============================================================================
-- type: Microsoft.DSC.Transitional/PowerShellScript
-  name: darkTheme
-  dependsOn:
-    - PowerShell
-  properties:
-    getScript: |
-      $regPath = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
-      $apps   = Get-ItemPropertyValue $regPath -Name AppsUseLightTheme    -EA SilentlyContinue
-      $system = Get-ItemPropertyValue $regPath -Name SystemUsesLightTheme -EA SilentlyContinue
-      return @{ AppsUseLightTheme = [int]$apps; SystemUsesLightTheme = [int]$system }
-    testScript: |
-      $regPath = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
-      $apps   = Get-ItemPropertyValue $regPath -Name AppsUseLightTheme    -EA SilentlyContinue
-      $system = Get-ItemPropertyValue $regPath -Name SystemUsesLightTheme -EA SilentlyContinue
-      return ($apps -eq 0 -and $system -eq 0)
-    setScript: |
-      $regPath = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
-      Set-ItemProperty -Path $regPath -Name "AppsUseLightTheme" -Value 0
-      Set-ItemProperty -Path $regPath -Name "SystemUsesLightTheme" -Value 0
-  metadata:
-    description: Sets dark theme
 
 # =============================================================================
 # Install Cascadia Code Nerd Fonts
@@ -649,6 +629,64 @@ resources:
     description: Disable Edge first-run experience
     securityContext: elevated
 
+# ---------------------------------------------------------------------------
+# Default search provider — Google instead of Bing.
+#
+# There is no user-preference registry value for this: Edge keeps the chosen
+# engine inside the profile's Web Data SQLite database, so the policy keys are
+# the only way to set it declaratively. Consequence worth knowing: a POLICY-set
+# search provider is enforced, so edge://settings/searchEngines shows it as
+# managed and the dropdown is locked. Delete these four resources to hand the
+# choice back to the UI.
+#
+# DefaultSearchProviderEnabled must be 1 or the other three are ignored.
+# https://learn.microsoft.com/deployedge/microsoft-edge-policies#defaultsearchprovider
+# ---------------------------------------------------------------------------
+
+- type: Microsoft.Windows/Registry
+  name: EdgeSearchProviderEnabled
+  properties:
+    keyPath: HKLM\SOFTWARE\Policies\Microsoft\Edge
+    valueName: DefaultSearchProviderEnabled
+    valueData:
+      DWord: 1
+  metadata:
+    description: Enable a policy-set default search provider in Edge
+    securityContext: elevated
+
+- type: Microsoft.Windows/Registry
+  name: EdgeSearchProviderName
+  properties:
+    keyPath: HKLM\SOFTWARE\Policies\Microsoft\Edge
+    valueName: DefaultSearchProviderName
+    valueData:
+      String: 'Google'
+  metadata:
+    description: Name the Edge default search provider Google
+    securityContext: elevated
+
+- type: Microsoft.Windows/Registry
+  name: EdgeSearchProviderUrl
+  properties:
+    keyPath: HKLM\SOFTWARE\Policies\Microsoft\Edge
+    valueName: DefaultSearchProviderSearchURL
+    valueData:
+      String: 'https://www.google.com/search?q={searchTerms}'
+  metadata:
+    description: Point Edge address-bar searches at Google
+    securityContext: elevated
+
+- type: Microsoft.Windows/Registry
+  name: EdgeSearchProviderSuggestUrl
+  properties:
+    keyPath: HKLM\SOFTWARE\Policies\Microsoft\Edge
+    valueName: DefaultSearchProviderSuggestURL
+    valueData:
+      String: 'https://www.google.com/complete/search?output=chrome&q={searchTerms}'
+  metadata:
+    description: Use Google for Edge address-bar search suggestions
+    securityContext: elevated
+
 # =============================================================================
 # Software Installs
 # =============================================================================
@@ -677,6 +715,9 @@ resources:
     description: Install GitHub CLI
     securityContext: elevated
 
+# GitHub.Copilot is the Copilot *CLI* - it provides the `copilot` command that
+# AddWinSkillsMarketplace and InstallWinUIPlugin below drive. The desktop app is
+# a separate package, GitHub.CopilotApp, installed just after this one.
 - type: Microsoft.WinGet/Package
   name: GitHubCopilot
   dependsOn:
@@ -687,7 +728,43 @@ resources:
     useLatest: true
     installMode: silent
   metadata:
-    description: Install GitHub Copilot
+    description: Install GitHub Copilot CLI
+
+- type: Microsoft.WinGet/Package
+  name: GitHubCopilotApp
+  properties:
+    id: GitHub.CopilotApp
+    source: winget
+    useLatest: true
+    installMode: silent
+  metadata:
+    description: Install the GitHub Copilot desktop app
+
+# =============================================================================
+# Claude
+# =============================================================================
+
+- type: Microsoft.WinGet/Package
+  name: ClaudeCode
+  dependsOn:
+  - Git
+  properties:
+    id: Anthropic.ClaudeCode
+    source: winget
+    useLatest: true
+    installMode: silent
+  metadata:
+    description: Install Claude Code
+
+- type: Microsoft.WinGet/Package
+  name: Claude
+  properties:
+    id: Anthropic.Claude
+    source: winget
+    useLatest: true
+    installMode: silent
+  metadata:
+    description: Install the Claude desktop app
 
 - type: Microsoft.WinGet/Package
   name: VSCode

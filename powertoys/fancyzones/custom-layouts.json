@@ -97,6 +97,33 @@
         ],
         "sensitivity-radius": 20
       }
+    },
+    {
+      "uuid": "{130313FE-126B-4564-BB2C-58EC2CBD6EA9}",
+      "name": "Big 3",
+      "type": "grid",
+      "info": {
+        "rows": 1,
+        "columns": 3,
+        "rows-percentage": [
+          10000
+        ],
+        "columns-percentage": [
+          3333,
+          3333,
+          3334
+        ],
+        "cell-child-map": [
+          [
+            0,
+            1,
+            2
+          ]
+        ],
+        "show-spacing": true,
+        "spacing": 16,
+        "sensitivity-radius": 20
+      }
     }
   ]
 }

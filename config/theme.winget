@@ -1,0 +1,44 @@
+# Theme — OPT-IN. Not applied unless bootstrap.ps1 is passed -DarkTheme.
+#
+# This used to live in dev-config.winget and ran on every provision, which meant
+# a fresh box silently came up in dark mode with no way to decline short of
+# editing the config. It is split out here for the same reason m365.winget is:
+# the base provision should only contain things wanted unconditionally.
+#
+# Apply with: winget configure -f theme.winget --accept-configuration-agreements --disable-interactivity
+
+$schema: https://raw.githubusercontent.com/PowerShell/DSC/main/schemas/2023/08/config/document.json
+metadata:
+  winget:
+    processor:
+      identifier: dscv3
+resources:
+
+# =============================================================================
+# Force dark theme
+# Uses app and system theme registry values to detect dark theme.
+#
+# NOTE: WindowsPowerShellScript, not PowerShellScript. The pwsh variant carries
+# condition "[not(equals(tryWhich('pwsh'), null()))]" and silently does not
+# resolve until PowerShell 7 is on PATH, which would make a standalone apply of
+# this file a no-op on a bare machine.
+# =============================================================================
+- type: Microsoft.DSC.Transitional/WindowsPowerShellScript
+  name: darkTheme
+  properties:
+    getScript: |
+      $regPath = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+      $apps   = Get-ItemPropertyValue $regPath -Name AppsUseLightTheme    -EA SilentlyContinue
+      $system = Get-ItemPropertyValue $regPath -Name SystemUsesLightTheme -EA SilentlyContinue
+      return @{ AppsUseLightTheme = [int]$apps; SystemUsesLightTheme = [int]$system }
+    testScript: |
+      $regPath = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+      $apps   = Get-ItemPropertyValue $regPath -Name AppsUseLightTheme    -EA SilentlyContinue
+      $system = Get-ItemPropertyValue $regPath -Name SystemUsesLightTheme -EA SilentlyContinue
+      return ($apps -eq 0 -and $system -eq 0)
+    setScript: |
+      $regPath = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+      Set-ItemProperty -Path $regPath -Name "AppsUseLightTheme" -Value 0
+      Set-ItemProperty -Path $regPath -Name "SystemUsesLightTheme" -Value 0
+  metadata:
+    description: Sets dark theme

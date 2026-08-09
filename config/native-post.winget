@@ -1,0 +1,107 @@
+# Native — post-reboot half of the non-Parallels overlay.
+#
+# Applied by bootstrap.ps1 only once vmcompute (the Hyper-V Host Compute
+# Service) exists, which is what proves Virtual Machine Platform actually took
+# effect. Everything in here needs a working WSL2 backend, so applying it before
+# the reboot fails with "The Windows Subsystem for Linux is not installed".
+#
+# bootstrap.ps1 reaches this file by one of two routes:
+#   - VMP was already active, so no reboot was needed and it applies inline.
+#   - It registered a RunOnce key, rebooted, and resumed via -Resume.
+#
+# Apply with: winget configure -f native-post.winget --accept-configuration-agreements --disable-interactivity
+
+$schema: https://raw.githubusercontent.com/PowerShell/DSC/main/schemas/2023/08/config/document.json
+metadata:
+  winget:
+    processor:
+      identifier: dscv3
+resources:
+
+# =============================================================================
+# WSL Phase 3 — Install default Ubuntu distro (VMP now active post-reboot)
+#
+# Carried over from upstream unchanged, including the Start-Process notes.
+# =============================================================================
+- type: Microsoft.DSC.Transitional/WindowsPowerShellScript
+  name: InstallUbuntu
+  properties:
+    getScript: |
+      # Run wsl --list via Start-Process with redirected output. Calling wsl.exe
+      # directly leaks its non-zero exit code (when no distro is installed) into
+      # $LASTEXITCODE and routes its stderr into PowerShell's error stream — both
+      # of which the dscv3 PowerShell adapter treats as a resource failure.
+      # Start-Process isolates the native call: stderr never reaches the error
+      # stream and $LASTEXITCODE is untouched.
+      $env:WSL_UTF8 = '1'
+      $distros = @()
+      $out = [System.IO.Path]::GetTempFileName()
+      $err = [System.IO.Path]::GetTempFileName()
+      $p = Start-Process -FilePath 'wsl.exe' -ArgumentList '--list','--quiet' `
+             -NoNewWindow -Wait -PassThru `
+             -RedirectStandardOutput $out -RedirectStandardError $err
+      if ($p.ExitCode -eq 0) {
+        $distros = @(Get-Content -LiteralPath $out -Encoding UTF8 |
+          ForEach-Object { ($_ -replace "`0", '').Trim() } |
+          Where-Object { $_ })
+      }
+      Remove-Item -LiteralPath $out, $err -Force -ErrorAction SilentlyContinue
+      return @{ distroCount = $distros.Count; distros = ($distros -join ',') }
+    testScript: |
+      $env:WSL_UTF8 = '1'
+      $out = [System.IO.Path]::GetTempFileName()
+      $err = [System.IO.Path]::GetTempFileName()
+      $p = Start-Process -FilePath 'wsl.exe' -ArgumentList '--list','--quiet' `
+             -NoNewWindow -Wait -PassThru `
+             -RedirectStandardOutput $out -RedirectStandardError $err
+      if ($p.ExitCode -ne 0) {
+        Remove-Item -LiteralPath $out, $err -Force -ErrorAction SilentlyContinue
+        return $false
+      }
+      $distros = @(Get-Content -LiteralPath $out -Encoding UTF8 |
+        ForEach-Object { ($_ -replace "`0", '').Trim() } |
+        Where-Object { $_ })
+      Remove-Item -LiteralPath $out, $err -Force -ErrorAction SilentlyContinue
+      return $distros.Count -gt 0
+    setScript: |
+      # Suppress the "Welcome to WSL" first-run GUI/OOBE
+      $lxssPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss'
+      New-Item -Path $lxssPath -Force | Out-Null
+      Set-ItemProperty -Path $lxssPath -Name 'OOBEComplete' -Value 1 -Type DWord -Force
+
+      Write-Host "InstallUbuntu: running wsl --install -d Ubuntu --no-launch..."
+      # Launch wsl.exe directly WITHOUT -NoNewWindow and WITHOUT -RedirectStandard*
+      # so Start-Process allocates a fresh console (CREATE_NEW_CONSOLE), which
+      # wsl's install bootstrap requires. The dscv3 host has no console to
+      # inherit, so -NoNewWindow (or -RedirectStandardOutput, which also
+      # suppresses the new console) makes wsl fail with "The Windows Subsystem
+      # for Linux is not installed". With no -Redirect* flags PowerShell never
+      # captures wsl's output — it goes to that console, not PowerShell's error
+      # stream — so there is no stderr-as-error problem and no cmd ">nul" needed.
+      $p = Start-Process -FilePath 'wsl.exe' -ArgumentList '--install','-d','Ubuntu','--no-launch' -Wait -PassThru
+      if ($p.ExitCode -ne 0) {
+        throw "InstallUbuntu: wsl --install -d Ubuntu --no-launch failed with exit code $($p.ExitCode)"
+      }
+  metadata:
+    description: Install the default Ubuntu WSL distro
+    securityContext: elevated
+
+# =============================================================================
+# Docker Desktop
+#
+# Uses the WSL2 backend, so it depends on a distro being present. The installer
+# adds the invoking user to the docker-users group; a sign-out is needed before
+# that membership takes effect.
+# =============================================================================
+- type: Microsoft.WinGet/Package
+  name: DockerDesktop
+  dependsOn:
+    - InstallUbuntu
+  properties:
+    id: Docker.DockerDesktop
+    source: winget
+    useLatest: true
+    installMode: silent
+  metadata:
+    description: Install Docker Desktop (WSL2 backend)
+    securityContext: elevated

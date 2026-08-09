@@ -1,0 +1,175 @@
+# Native — pre-reboot half of the non-Parallels overlay.
+#
+# Applied on top of dev-config.winget when bootstrap.ps1 resolves to Native mode
+# (i.e. this is NOT a Parallels guest). Everything here is a thing the Parallels
+# ARM guest cannot do, which is exactly why it lives outside the base config.
+#
+# Apply with: winget configure -f native.winget --accept-configuration-agreements --disable-interactivity
+#
+# ---------------------------------------------------------------------------
+# Why this file stops short of installing Ubuntu
+# ---------------------------------------------------------------------------
+# Virtual Machine Platform is not active until the machine reboots, and nothing
+# WSL-hosted (the Ubuntu distro, Docker Desktop's WSL2 backend) can install
+# before it is. Upstream handles that with a RebootForVmp resource that calls
+# Restart-Computer -Force from inside a DSC setScript and then throws, so DSC
+# marks the run failed and a RunOnce key resumes it.
+#
+# This repo keeps the auto-reboot and the RunOnce resume, but moves them into
+# bootstrap.ps1 so the reboot happens AFTER the base config, Terminal and
+# FancyZones have all landed. Rebooting from the middle of a DSC apply means an
+# interrupted resume costs the entire provision; rebooting at the end costs
+# only the post-reboot half. The post-reboot units live in native-post.winget.
+
+$schema: https://raw.githubusercontent.com/PowerShell/DSC/main/schemas/2023/08/config/document.json
+metadata:
+  winget:
+    processor:
+      identifier: dscv3
+resources:
+
+# =============================================================================
+# Windows optional features
+#
+# WSL2 does NOT require Hyper-V. It requires VirtualMachinePlatform, which is a
+# separate and much lighter feature: it registers the same vmcompute (Host
+# Compute Service) plumbing WSL2 runs on, without the Hyper-V role, the virtual
+# switch stack, or Hyper-V Manager. That is why the WSL unit below tests for
+# vmcompute and shells out to `wsl --install`, and never touches Hyper-V.
+#
+# Hyper-V is enabled here anyway, because a non-Parallels box is the one place
+# it is actually usable - full VMs, and Docker Desktop's Hyper-V backend if the
+# WSL2 backend is ever not wanted. Drop 'Microsoft-Hyper-V-All' from the list
+# below if that is not wanted; WSL and Docker still work without it.
+#
+# Microsoft-Hyper-V-All, not Microsoft-Hyper-V. The two are easy to confuse:
+#   Microsoft-Hyper-V      - the hypervisor and services only, no tooling
+#   Microsoft-Hyper-V-All  - umbrella: hypervisor + Manager GUI + PowerShell module
+# The -All switch on Enable-WindowsOptionalFeature is unrelated to the feature
+# name - it enables the specified feature's PARENT features, not its children.
+# So `-FeatureName Microsoft-Hyper-V -All` installs no management tools.
+#
+# VirtualMachinePlatform and Microsoft-Windows-Subsystem-Linux are also enabled
+# by `wsl --install` below; they are listed here so the feature state is
+# declared in one place and so a machine that only wants Hyper-V still converges.
+#
+# Microsoft-Hyper-V-All and Containers-DisposableClientVM (Windows Sandbox) do
+# not exist on Home. Get-WindowsOptionalFeature throws for an unknown feature
+# name rather than returning null, so each one is probed individually and a
+# missing feature is skipped rather than failing the unit.
+# =============================================================================
+- type: Microsoft.DSC.Transitional/WindowsPowerShellScript
+  name: VirtualizationFeatures
+  properties:
+    getScript: |
+      $features = @(
+        'VirtualMachinePlatform'
+        'Microsoft-Windows-Subsystem-Linux'
+        'Containers'
+        'Microsoft-Hyper-V-All'
+        'Containers-DisposableClientVM'
+      )
+      $state = @{}
+      foreach ($f in $features) {
+        $info = Get-WindowsOptionalFeature -Online -FeatureName $f -ErrorAction SilentlyContinue
+        if ($info) { $state[$f] = [string]$info.State } else { $state[$f] = 'NotPresentOnThisEdition' }
+      }
+      return $state
+    testScript: |
+      $features = @(
+        'VirtualMachinePlatform'
+        'Microsoft-Windows-Subsystem-Linux'
+        'Containers'
+        'Microsoft-Hyper-V-All'
+        'Containers-DisposableClientVM'
+      )
+      foreach ($f in $features) {
+        $info = Get-WindowsOptionalFeature -Online -FeatureName $f -ErrorAction SilentlyContinue
+        # A feature this edition does not have cannot be out of compliance.
+        if (-not $info) { continue }
+        if ($info.State -ne 'Enabled') { return $false }
+      }
+      return $true
+    setScript: |
+      $features = @(
+        'VirtualMachinePlatform'
+        'Microsoft-Windows-Subsystem-Linux'
+        'Containers'
+        'Microsoft-Hyper-V-All'
+        'Containers-DisposableClientVM'
+      )
+      foreach ($f in $features) {
+        $info = Get-WindowsOptionalFeature -Online -FeatureName $f -ErrorAction SilentlyContinue
+        if (-not $info) {
+          Write-Host "  skip (not available on this Windows edition): $f"
+          continue
+        }
+        if ($info.State -eq 'Enabled') {
+          Write-Host "  already enabled: $f"
+          continue
+        }
+        Write-Host "  enabling: $f"
+        # -NoRestart throughout: bootstrap.ps1 owns the reboot decision so it can
+        # take it once, at the end, rather than once per feature.
+        Enable-WindowsOptionalFeature -Online -FeatureName $f -All -NoRestart -ErrorAction Stop | Out-Null
+      }
+  metadata:
+    description: Enable Virtual Machine Platform, WSL, Containers, Hyper-V and Windows Sandbox
+    securityContext: elevated
+
+# =============================================================================
+# WSL Phase 1 — Enable WSL optional components via wsl --install
+#            (enables Virtual Machine Platform; reboot required)
+#
+# Carried over from upstream unchanged, including the Start-Process notes.
+# =============================================================================
+- type: Microsoft.DSC.Transitional/WindowsPowerShellScript
+  name: InstallWslComponents
+  dependsOn:
+    - VirtualizationFeatures
+  properties:
+    getScript: |
+      $svc = Get-CimInstance -ClassName Win32_Service -Filter "Name='vmcompute'"
+      return @{ vmcomputePresent = [bool]$svc }
+    testScript: |
+      # If vmcompute is present, VMP is active — components already installed.
+      $svc = Get-CimInstance -ClassName Win32_Service -Filter "Name='vmcompute'"
+      return [bool]$svc
+    setScript: |
+      Write-Host "InstallWslComponents: running wsl --install --no-distribution..."
+      # Launch wsl.exe directly WITHOUT -NoNewWindow and WITHOUT -RedirectStandard*
+      # so Start-Process allocates a fresh console (CREATE_NEW_CONSOLE), which
+      # wsl's install bootstrap requires. The dscv3 host has no console to
+      # inherit, so -NoNewWindow (or -RedirectStandardOutput, which also
+      # suppresses the new console) makes wsl fail with "The Windows Subsystem
+      # for Linux is not installed". With no -Redirect* flags PowerShell never
+      # captures wsl's output — it goes to that console, not PowerShell's error
+      # stream — so there is no stderr-as-error problem and no cmd ">nul" needed.
+      $p = Start-Process -FilePath 'wsl.exe' -ArgumentList '--install','--no-distribution' -Wait -PassThru
+      if ($p.ExitCode -eq 3010 -or $p.ExitCode -eq 1641) {
+        Write-Host "WSL installed successfully, but a system reboot is required."
+      }
+      elseif ($p.ExitCode -ne 0) {
+        throw "InstallWslComponents: wsl --install failed with exit code $($p.ExitCode)"
+      }
+  metadata:
+    description: Install the WSL optional components (reboot required afterwards)
+    securityContext: elevated
+
+# =============================================================================
+# Native-only packages that do NOT need the reboot
+#
+# Anything requiring the WSL2 backend (Docker Desktop) belongs in
+# native-post.winget instead. Add further native-only tools here.
+# =============================================================================
+
+- type: Microsoft.WinGet/Package
+  name: Sysinternals
+  properties:
+    id: Microsoft.Sysinternals
+    source: winget
+    useLatest: true
+    installMode: silent
+  metadata:
+    description: Install Sysinternals Suite
+    securityContext: elevated
