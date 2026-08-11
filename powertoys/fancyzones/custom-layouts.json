@@ -99,6 +99,31 @@
       }
     },
     {
+      "uuid": "{8D1823CB-1521-4DC7-93F4-4178674C53C1}",
+      "name": "Big 2",
+      "type": "grid",
+      "info": {
+        "rows": 1,
+        "columns": 2,
+        "rows-percentage": [
+          10000
+        ],
+        "columns-percentage": [
+          5000,
+          5000
+        ],
+        "cell-child-map": [
+          [
+            0,
+            1
+          ]
+        ],
+        "show-spacing": true,
+        "spacing": 16,
+        "sensitivity-radius": 20
+      }
+    },
+    {
       "uuid": "{130313FE-126B-4564-BB2C-58EC2CBD6EA9}",
       "name": "Big 3",
       "type": "grid",
