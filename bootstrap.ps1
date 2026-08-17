@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
   Provisions a Windows machine from this repo: applies the winget DSC config,
-  then enables FancyZones and imports zone layouts.
+  then configures PowerToys - the macOS-compatible Keyboard Manager remaps and
+  the FancyZones zone layouts.
 
 .DESCRIPTION
   Must run elevated - most resources in config\dev-config.winget declare
@@ -32,6 +33,14 @@
   Folder holding custom-layouts.json etc. Defaults to powertoys\fancyzones
   under RepoRoot.
 
+.PARAMETER KeyboardManagerSource
+  Folder holding default.json / editorSettings.json. Defaults to
+  powertoys\keyboard-manager under RepoRoot.
+
+.PARAMETER SkipKeyboardManager
+  Leave PowerToys Keyboard Manager alone - keep this machine's stock Windows
+  keys instead of the macOS-compatible remaps.
+
 .PARAMETER DarkTheme
   Opt in to forcing dark mode (config\theme.winget). Off by default.
 
@@ -50,12 +59,14 @@
 param(
     [string]$RepoRoot,
     [string]$FancyZonesSource,
+    [string]$KeyboardManagerSource,
 
     [ValidateSet('Auto', 'Parallels', 'Native')]
     [string]$Mode = 'Auto',
 
     [switch]$SkipProvision,
     [switch]$SkipFancyZones,
+    [switch]$SkipKeyboardManager,
     # Bindable as -m365; PowerShell parameter matching is case-insensitive.
     [switch]$M365,
     # Dark mode is opt-in. It used to be unconditional in dev-config.winget.
@@ -102,6 +113,10 @@ if (-not $FancyZonesSource) {
     $FancyZonesSource = Join-Path $RepoRoot 'powertoys\fancyzones'
 }
 
+if (-not $KeyboardManagerSource) {
+    $KeyboardManagerSource = Join-Path $RepoRoot 'powertoys\keyboard-manager'
+}
+
 $configFile     = Join-Path $RepoRoot 'config\dev-config.winget'
 $m365File       = Join-Path $RepoRoot 'config\m365.winget'
 $themeFile      = Join-Path $RepoRoot 'config\theme.winget'
@@ -109,6 +124,7 @@ $nativeFile     = Join-Path $RepoRoot 'config\native.winget'
 $nativePostFile = Join-Path $RepoRoot 'config\native-post.winget'
 $profileLib     = Join-Path $RepoRoot 'lib\Get-MachineProfile.ps1'
 $importer       = Join-Path $RepoRoot 'powertoys\Import-FancyZones.ps1'
+$kbmImporter    = Join-Path $RepoRoot 'powertoys\Import-KeyboardManager.ps1'
 
 # Where the post-reboot resume artifacts are written. Deliberately outside the
 # repo so a `git clean` cannot strip a pending resume.
@@ -409,6 +425,26 @@ if (-not $Resume) {
         }
         if ($PSBoundParameters.ContainsKey('WhatIf')) { $termArgs['WhatIf'] = $true }
         & $terminalScript @termArgs
+    }
+}
+
+# --- Keyboard Manager ---------------------------------------------------------
+# Before FancyZones on purpose: both importers restart PowerToys, and this way
+# the FancyZones one is the last word (and its editor hint stays on screen).
+if ($Resume) {
+    # nothing - Keyboard Manager ran before the reboot
+} elseif ($SkipKeyboardManager) {
+    Write-Step 'Skipping Keyboard Manager (-SkipKeyboardManager)'
+} else {
+    Write-Step 'Configuring Keyboard Manager'
+
+    $remaps = Join-Path $KeyboardManagerSource 'default.json'
+    if (-not (Test-Path $remaps)) {
+        Write-Warning "No default.json in $KeyboardManagerSource - skipping the keyboard remaps."
+    } else {
+        $kbmArgs = @{ SourcePath = $KeyboardManagerSource }
+        if ($PSBoundParameters.ContainsKey('WhatIf')) { $kbmArgs['WhatIf'] = $true }
+        & $kbmImporter @kbmArgs
     }
 }
 

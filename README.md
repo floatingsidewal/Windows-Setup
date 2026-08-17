@@ -211,7 +211,7 @@ feature's **parents**, not its children:
 
 ```
 install.ps1                    # irm | iex entry point: git -> clone -> elevate
-bootstrap.ps1                  # detect mode -> provision -> FancyZones -> native extras
+bootstrap.ps1                  # detect mode -> provision -> PowerToys -> native extras
 Test-Clean.ps1                 # PII/secret scanner, exits 1 on findings
 lib/
   Get-MachineProfile.ps1       # Parallels vs Native detection (-DetectOnly)
@@ -224,7 +224,9 @@ config/
   m365.winget                  # OPT-IN: OneDrive + Microsoft 365 Apps (-m365)
 powertoys/
   Import-FancyZones.ps1        # enables FancyZones, imports layouts, overrides snap
+  Import-KeyboardManager.ps1   # enables Keyboard Manager, imports the macOS remaps
   fancyzones/                  # drop custom-layouts.json etc. here (see below)
+  keyboard-manager/            # default.json + editorSettings.json (macOS remaps)
 dotfiles/
   Configure-Terminal.ps1       # bell sounds + paste warnings, one settings.json write
 .sounds/                       # bell sound pack (tracked on purpose)
@@ -318,6 +320,22 @@ monitor hardware IDs and won't match a different display. They're gitignored.
 After importing, assign a layout to the display once via **Win+Shift+`**.
 Setting a default per orientation makes it stick automatically when the
 Parallels display resolution changes.
+
+## Keyboard Manager
+
+`Import-KeyboardManager.ps1` runs just before the FancyZones import and applies
+the macOS-compatible remaps in `powertoys/keyboard-manager/` — the Mac's Cmd key
+arrives in Windows as Win, so Win+C/V/X/A/W/Z/S/F/O/N/T/B/U send the Ctrl
+equivalent, Win+Q sends Alt+F4, and Caps Lock sends Ctrl+Alt+Break. Win+I, Win+E,
+Win+R, Win+P and Win+L are deliberately untouched. Full table and refresh
+instructions: [`powertoys/keyboard-manager/README.md`](powertoys/keyboard-manager/README.md).
+
+Both `default.json` (read by the remap engine) and `editorSettings.json` (read by
+the editor UI) are tracked — shipping only the first makes the editor render an
+empty list and wipe the remaps on its next save.
+
+Skip it with `.\bootstrap.ps1 -SkipKeyboardManager` on a machine with a real PC
+keyboard.
 
 ## No Microsoft Store
 
