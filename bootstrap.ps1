@@ -1,8 +1,8 @@
 <#
 .SYNOPSIS
   Provisions a Windows machine from this repo: applies the winget DSC config,
-  then configures PowerToys - the macOS-compatible Keyboard Manager remaps and
-  the FancyZones zone layouts.
+  configures Explorer and Windows Terminal, then configures PowerToys - the
+  macOS-compatible Keyboard Manager remaps and the FancyZones zone layouts.
 
 .DESCRIPTION
   Must run elevated - most resources in config\dev-config.winget declare
@@ -125,6 +125,7 @@ $nativePostFile = Join-Path $RepoRoot 'config\native-post.winget'
 $profileLib     = Join-Path $RepoRoot 'lib\Get-MachineProfile.ps1'
 $importer       = Join-Path $RepoRoot 'powertoys\Import-FancyZones.ps1'
 $kbmImporter    = Join-Path $RepoRoot 'powertoys\Import-KeyboardManager.ps1'
+$explorerScript = Join-Path $RepoRoot 'dotfiles\Configure-Explorer.ps1'
 
 # Where the post-reboot resume artifacts are written. Deliberately outside the
 # repo so a `git clean` cannot strip a pending resume.
@@ -407,6 +408,18 @@ if (-not $Resume) {
     } else {
         Write-Step 'Leaving the Windows theme alone (pass -DarkTheme to force dark mode)'
     }
+}
+
+# --- File Explorer ------------------------------------------------------------
+if (-not $Resume) {
+    Write-Step 'Configuring File Explorer (classic context menu)'
+    if (-not (Test-Path $explorerScript)) {
+        throw "Configure-Explorer.ps1 not found: $explorerScript"
+    }
+
+    $explorerArgs = @{}
+    if ($PSBoundParameters.ContainsKey('WhatIf')) { $explorerArgs['WhatIf'] = $true }
+    & $explorerScript @explorerArgs
 }
 
 # --- Windows Terminal -----------------------------------------------------------

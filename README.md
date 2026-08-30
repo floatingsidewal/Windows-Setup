@@ -211,7 +211,7 @@ feature's **parents**, not its children:
 
 ```
 install.ps1                    # irm | iex entry point: git -> clone -> elevate
-bootstrap.ps1                  # detect mode -> provision -> PowerToys -> native extras
+bootstrap.ps1                  # detect -> provision -> Explorer/Terminal/PowerToys -> native
 Test-Clean.ps1                 # PII/secret scanner, exits 1 on findings
 lib/
   Get-MachineProfile.ps1       # Parallels vs Native detection (-DetectOnly)
@@ -228,6 +228,7 @@ powertoys/
   fancyzones/                  # drop custom-layouts.json etc. here (see below)
   keyboard-manager/            # default.json + editorSettings.json (macOS remaps)
 dotfiles/
+  Configure-Explorer.ps1       # restores the classic Windows 11 context menu
   Configure-Terminal.ps1       # bell sounds + paste warnings, one settings.json write
 .sounds/                       # bell sound pack (tracked on purpose)
 ```
@@ -250,6 +251,12 @@ repo — they were rebuilt into `config/native.winget` and
 **Dark theme is opt-in.** Upstream's `darkTheme` unit ran on every provision and
 forced dark mode with no way to decline. It now lives in `config/theme.winget`
 and only applies with `-DarkTheme`.
+
+**The classic File Explorer context menu is restored.** Bootstrap creates the
+empty `InprocServer32` default value under
+`HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}` and
+restarts Explorer when the setting changes. Re-running setup leaves Explorer
+alone once the value is already configured.
 
 **Edge searches Google, not Bing.** Four `DefaultSearchProvider*` policy values
 under `HKLM\SOFTWARE\Policies\Microsoft\Edge`. There is no user-preference
