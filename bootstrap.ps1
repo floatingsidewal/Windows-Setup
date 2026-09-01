@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
   Provisions a Windows machine from this repo: applies the winget DSC config,
+  keeps PowerShell profiles/modules out of redirected Documents storage,
   configures Explorer and Windows Terminal, then configures PowerToys - the
   macOS-compatible Keyboard Manager remaps and the FancyZones zone layouts.
 
@@ -126,6 +127,7 @@ $profileLib     = Join-Path $RepoRoot 'lib\Get-MachineProfile.ps1'
 $importer       = Join-Path $RepoRoot 'powertoys\Import-FancyZones.ps1'
 $kbmImporter    = Join-Path $RepoRoot 'powertoys\Import-KeyboardManager.ps1'
 $explorerScript = Join-Path $RepoRoot 'dotfiles\Configure-Explorer.ps1'
+$powerShellStorageScript = Join-Path $RepoRoot 'dotfiles\Configure-PowerShellStorage.ps1'
 
 # Where the post-reboot resume artifacts are written. Deliberately outside the
 # repo so a `git clean` cannot strip a pending resume.
@@ -408,6 +410,20 @@ if (-not $Resume) {
     } else {
         Write-Step 'Leaving the Windows theme alone (pass -DarkTheme to force dark mode)'
     }
+}
+
+# --- PowerShell storage -------------------------------------------------------
+if (-not $Resume) {
+    Write-Step 'Keeping PowerShell profiles and modules in local storage'
+    if (-not (Test-Path $powerShellStorageScript)) {
+        throw "Configure-PowerShellStorage.ps1 not found: $powerShellStorageScript"
+    }
+
+    $powerShellStorageArgs = @{}
+    if ($PSBoundParameters.ContainsKey('WhatIf')) {
+        $powerShellStorageArgs['WhatIf'] = $true
+    }
+    & $powerShellStorageScript @powerShellStorageArgs
 }
 
 # --- File Explorer ------------------------------------------------------------

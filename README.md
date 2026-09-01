@@ -58,8 +58,9 @@ unavailable.
    ```
 
    Installs git, creates `~/git`, clones, elevates into `bootstrap.ps1`, applies
-   the winget config, then imports FancyZones and starts PowerToys. Single pass.
-   This is the long step.
+   the winget config, moves PowerShell profile/module storage out of redirected
+   Documents, then imports FancyZones and starts PowerToys. Single pass. This is
+   the long step.
 
    On a **Native** machine it then applies the native overlay and reboots to
    activate Virtual Machine Platform, resuming itself after you log back in to
@@ -211,7 +212,7 @@ feature's **parents**, not its children:
 
 ```
 install.ps1                    # irm | iex entry point: git -> clone -> elevate
-bootstrap.ps1                  # detect -> provision -> Explorer/Terminal/PowerToys -> native
+bootstrap.ps1                  # detect -> provision -> PowerShell/Explorer/Terminal/PowerToys -> native
 Test-Clean.ps1                 # PII/secret scanner, exits 1 on findings
 lib/
   Get-MachineProfile.ps1       # Parallels vs Native detection (-DetectOnly)
@@ -228,6 +229,7 @@ powertoys/
   fancyzones/                  # drop custom-layouts.json etc. here (see below)
   keyboard-manager/            # default.json + editorSettings.json (macOS remaps)
 dotfiles/
+  Configure-PowerShellStorage.ps1 # keeps profiles/modules out of redirected Documents
   Configure-Explorer.ps1       # restores the classic Windows 11 context menu
   Configure-Terminal.ps1       # bell sounds + paste warnings, one settings.json write
 .sounds/                       # bell sound pack (tracked on purpose)
@@ -251,6 +253,15 @@ repo — they were rebuilt into `config/native.winget` and
 **Dark theme is opt-in.** Upstream's `darkTheme` unit ran on every provision and
 forced dark mode with no way to decline. It now lives in `config/theme.winget`
 and only applies with `-DarkTheme`.
+
+**PowerShell state stays local when Documents is redirected.** Bootstrap moves
+`Documents\WindowsPowerShell` and `Documents\PowerShell` into matching
+directories under `%LOCALAPPDATA%`, then leaves junctions at the standard
+Documents paths. Existing files are copied before the source is removed, copy
+errors stop the migration, conflicting local files are never overwritten, and
+repeated runs leave correct junctions alone. The persistent user `PSModulePath`
+is also cleaned of the redirected module directories and pointed at the local
+module directories.
 
 **The classic File Explorer context menu is restored.** Bootstrap creates the
 empty `InprocServer32` default value under
