@@ -128,6 +128,7 @@ $importer       = Join-Path $RepoRoot 'powertoys\Import-FancyZones.ps1'
 $kbmImporter    = Join-Path $RepoRoot 'powertoys\Import-KeyboardManager.ps1'
 $explorerScript = Join-Path $RepoRoot 'dotfiles\Configure-Explorer.ps1'
 $powerShellStorageScript = Join-Path $RepoRoot 'dotfiles\Configure-PowerShellStorage.ps1'
+$longPathsScript = Join-Path $RepoRoot 'dotfiles\Configure-LongPaths.ps1'
 
 # Where the post-reboot resume artifacts are written. Deliberately outside the
 # repo so a `git clean` cannot strip a pending resume.
@@ -246,6 +247,17 @@ or open PowerShell as Administrator and re-run.
     & $sudo.Source $shell @fwd
     exit $LASTEXITCODE
 }
+
+# Long paths are a baseline machine policy, not an optional package-provisioning
+# concern. Enforce them on every mutating run, including -SkipProvision and
+# post-reboot resume.
+Write-Step 'Ensuring Win32 long-path support is enabled'
+if (-not (Test-Path $longPathsScript)) {
+    throw "Configure-LongPaths.ps1 not found: $longPathsScript"
+}
+$longPathsArgs = @{}
+if ($WhatIfPreference) { $longPathsArgs['WhatIf'] = $true }
+& $longPathsScript @longPathsArgs
 
 if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
     throw 'winget not found. Install "App Installer" from the Microsoft Store first.'

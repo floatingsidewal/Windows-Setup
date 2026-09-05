@@ -57,10 +57,10 @@ unavailable.
    irm https://raw.githubusercontent.com/floatingsidewal/Windows-Setup/main/install.ps1 | iex
    ```
 
-   Installs git, creates `~/git`, clones, elevates into `bootstrap.ps1`, applies
-   the winget config, moves PowerShell profile/module storage out of redirected
-   Documents, then imports FancyZones and starts PowerToys. Single pass. This is
-   the long step.
+   Installs git, creates `~/git`, clones, elevates into `bootstrap.ps1`, enables
+   Win32 long-path support, applies the winget config, moves PowerShell
+   profile/module storage out of redirected Documents, then imports FancyZones
+   and starts PowerToys. Single pass. This is the long step.
 
    On a **Native** machine it then applies the native overlay and reboots to
    activate Virtual Machine Platform, resuming itself after you log back in to
@@ -129,6 +129,11 @@ cd ~/git/Windows-Setup
 
 Re-running `install.ps1` on an existing clone does a `git pull --ff-only`, so
 local commits are never silently discarded.
+
+Every mutating `bootstrap.ps1` run checks
+`HKLM\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled` and sets it
+to DWORD `1` when needed. This check is independent of winget provisioning, so
+it also runs with `-SkipProvision` and during a post-reboot resume.
 
 ## Modes
 
