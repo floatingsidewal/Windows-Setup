@@ -322,6 +322,44 @@
       },
       "Profiles": [],
       "IsActive": true
+    },
+    "89b38d39-bf7d-4295-bbe9-b3431a169096": {
+      "Id": "89b38d39-bf7d-4295-bbe9-b3431a169096",
+      "Shortcut": {
+        "OriginalKeys": "162;160;40",
+        "TargetKeys": "174",
+        "TargetApp": "",
+        "OperationType": 0,
+        "TargetText": "",
+        "ProgramPath": "",
+        "ProgramArgs": "",
+        "StartInDirectory": "",
+        "Elevation": 0,
+        "IfRunningAction": 0,
+        "Visibility": 0,
+        "UriToOpen": ""
+      },
+      "Profiles": [],
+      "IsActive": true
+    },
+    "e7b221fc-d850-4f20-a2cf-aac2fa6fae2b": {
+      "Id": "e7b221fc-d850-4f20-a2cf-aac2fa6fae2b",
+      "Shortcut": {
+        "OriginalKeys": "162;160;38",
+        "TargetKeys": "175",
+        "TargetApp": "",
+        "OperationType": 0,
+        "TargetText": "",
+        "ProgramPath": "",
+        "ProgramArgs": "",
+        "StartInDirectory": "",
+        "Elevation": 0,
+        "IfRunningAction": 0,
+        "Visibility": 0,
+        "UriToOpen": ""
+      },
+      "Profiles": [],
+      "IsActive": true
     }
   },
   "ProfileDictionary": {},
@@ -343,7 +381,9 @@
       "b1000000-0007-4a00-9000-ac0dec0d0085",
       "b1000000-0008-4a00-9000-ac0dec0d0090",
       "b1000000-0009-4a00-9000-ac0dec0d1084",
-      "b1000000-0010-4a00-9000-ac0dec0d1090"
+      "b1000000-0010-4a00-9000-ac0dec0d1090",
+      "89b38d39-bf7d-4295-bbe9-b3431a169096",
+      "e7b221fc-d850-4f20-a2cf-aac2fa6fae2b"
     ]
   },
   "ActiveProfile": ""

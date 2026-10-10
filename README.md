@@ -350,8 +350,11 @@ Parallels display resolution changes.
 the macOS-compatible remaps in `powertoys/keyboard-manager/` — the Mac's Cmd key
 arrives in Windows as Win, so Win+C/V/X/A/W/Z/S/F/O/N/T/B/U send the Ctrl
 equivalent, Win+Q sends Alt+F4, and Caps Lock sends Ctrl+Alt+Break. Win+I, Win+E,
-Win+R, Win+P and Win+L are deliberately untouched. Full table and refresh
-instructions: [`powertoys/keyboard-manager/README.md`](powertoys/keyboard-manager/README.md).
+Win+R, Win+P and Win+L are deliberately untouched. Ctrl+Shift+Up / Down send
+Volume Up / Down for keyboards without media keys; that one is global, so it
+shadows Excel's extend-selection and Windows Terminal's line scroll. Full table,
+the list of what each remap displaces, and refresh instructions:
+[`powertoys/keyboard-manager/README.md`](powertoys/keyboard-manager/README.md).
 
 Both `default.json` (read by the remap engine) and `editorSettings.json` (read by
 the editor UI) are tracked — shipping only the first makes the editor render an
